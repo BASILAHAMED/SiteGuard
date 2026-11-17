@@ -1,0 +1,10 @@
+{
+  "name": "SiteGuard",
+  "description": "Device-agnostic AI heat-strain prediction, multilingual worker safety alerts, and UAE Midday Working Break compliance platform by GenOS Team.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

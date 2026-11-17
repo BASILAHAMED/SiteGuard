@@ -1,0 +1,65 @@
+{
+  "_comment": "Deterministic 12-15 min trend fixtures (3-min sampling steps) for Weighted Damped Trend + Residual CI forecast engine.",
+  "fixtures": [
+    {
+      "name": "flat_trend",
+      "wbgtSlopePerHour": 0.0,
+      "history": [
+        { "minuteOffset": 0, "timestamp": "2025-08-14T08:00:00+04:00", "psi": 2.5, "compositeScore": 2.8, "wbgtC": 32.0, "degraded": false },
+        { "minuteOffset": 3, "timestamp": "2025-08-14T08:03:00+04:00", "psi": 2.5, "compositeScore": 2.8, "wbgtC": 32.0, "degraded": false },
+        { "minuteOffset": 6, "timestamp": "2025-08-14T08:06:00+04:00", "psi": 2.5, "compositeScore": 2.8, "wbgtC": 32.0, "degraded": false },
+        { "minuteOffset": 9, "timestamp": "2025-08-14T08:09:00+04:00", "psi": 2.5, "compositeScore": 2.8, "wbgtC": 32.0, "degraded": false },
+        { "minuteOffset": 12, "timestamp": "2025-08-14T08:12:00+04:00", "psi": 2.5, "compositeScore": 2.8, "wbgtC": 32.0, "degraded": false }
+      ],
+      "expected": { "status": "ready", "slopePerMin": 0.0, "psi15Point": 2.8, "psi30Point": 2.8, "predictedTier15": "Green", "predictedTier30": "Green", "projectedAmberCrossingMin": null }
+    },
+    {
+      "name": "rising_trend",
+      "wbgtSlopePerHour": 0.0,
+      "history": [
+        { "minuteOffset": 0, "timestamp": "2025-08-14T09:00:00+04:00", "psi": 2.6, "compositeScore": 2.8, "wbgtC": 33.1, "degraded": false },
+        { "minuteOffset": 3, "timestamp": "2025-08-14T09:03:00+04:00", "psi": 2.9, "compositeScore": 3.1, "wbgtC": 33.1, "degraded": false },
+        { "minuteOffset": 6, "timestamp": "2025-08-14T09:06:00+04:00", "psi": 3.2, "compositeScore": 3.4, "wbgtC": 33.1, "degraded": false },
+        { "minuteOffset": 9, "timestamp": "2025-08-14T09:09:00+04:00", "psi": 3.5, "compositeScore": 3.7, "wbgtC": 33.1, "degraded": false },
+        { "minuteOffset": 12, "timestamp": "2025-08-14T09:12:00+04:00", "psi": 3.8, "compositeScore": 4.0, "wbgtC": 33.1, "degraded": false }
+      ],
+      "expected": { "status": "ready", "slopePerMin": 0.088, "psi15Point": 5.32, "psi30Point": 6.33, "predictedTier15": "Amber", "predictedTier30": "Amber", "projectedAmberCrossingMin": 0 }
+    },
+    {
+      "name": "falling_trend",
+      "wbgtSlopePerHour": 0.0,
+      "history": [
+        { "minuteOffset": 0, "timestamp": "2025-08-14T11:00:00+04:00", "psi": 5.8, "compositeScore": 5.6, "wbgtC": 34.0, "degraded": false },
+        { "minuteOffset": 3, "timestamp": "2025-08-14T11:03:00+04:00", "psi": 5.3, "compositeScore": 5.2, "wbgtC": 34.0, "degraded": false },
+        { "minuteOffset": 6, "timestamp": "2025-08-14T11:06:00+04:00", "psi": 4.8, "compositeScore": 4.8, "wbgtC": 34.0, "degraded": false },
+        { "minuteOffset": 9, "timestamp": "2025-08-14T11:09:00+04:00", "psi": 4.3, "compositeScore": 4.4, "wbgtC": 34.0, "degraded": false },
+        { "minuteOffset": 12, "timestamp": "2025-08-14T11:12:00+04:00", "psi": 3.8, "compositeScore": 4.0, "wbgtC": 34.0, "degraded": false }
+      ],
+      "expected": { "status": "ready", "slopePerMin": -0.117, "psi15Point": 2.24, "psi30Point": 0.89, "predictedTier15": "Green", "predictedTier30": "Green", "projectedAmberCrossingMin": 0 }
+    },
+    {
+      "name": "noisy_oscillating_trend",
+      "wbgtSlopePerHour": 0.0,
+      "history": [
+        { "minuteOffset": 0, "timestamp": "2025-08-14T10:00:00+04:00", "psi": 3.2, "compositeScore": 3.4, "wbgtC": 34.1, "degraded": false },
+        { "minuteOffset": 3, "timestamp": "2025-08-14T10:03:00+04:00", "psi": 3.8, "compositeScore": 3.9, "wbgtC": 34.1, "degraded": false },
+        { "minuteOffset": 6, "timestamp": "2025-08-14T10:06:00+04:00", "psi": 3.1, "compositeScore": 3.3, "wbgtC": 34.1, "degraded": false },
+        { "minuteOffset": 9, "timestamp": "2025-08-14T10:09:00+04:00", "psi": 3.9, "compositeScore": 4.0, "wbgtC": 34.1, "degraded": false },
+        { "minuteOffset": 12, "timestamp": "2025-08-14T10:12:00+04:00", "psi": 3.3, "compositeScore": 3.5, "wbgtC": 34.1, "degraded": false },
+        { "minuteOffset": 15, "timestamp": "2025-08-14T10:15:00+04:00", "psi": 3.6, "compositeScore": 3.7, "wbgtC": 34.1, "degraded": false }
+      ],
+      "expected": { "status": "ready", "slopePerMin": 0.007, "psi15Point": 3.49, "psi30Point": 2.9, "minHalfWidth15": 0.8, "predictedTier15": "Green", "predictedTier30": "Green" }
+    },
+    {
+      "name": "tier_crossing_green_to_amber_to_red",
+      "wbgtSlopePerHour": 0.4,
+      "history": [
+        { "minuteOffset": 0, "timestamp": "2025-08-14T11:00:00+04:00", "psi": 2.9, "compositeScore": 3.1, "wbgtC": 35.0, "degraded": false },
+        { "minuteOffset": 3, "timestamp": "2025-08-14T11:03:00+04:00", "psi": 3.3, "compositeScore": 3.4, "wbgtC": 35.0, "degraded": false },
+        { "minuteOffset": 6, "timestamp": "2025-08-14T11:06:00+04:00", "psi": 3.7, "compositeScore": 3.7, "wbgtC": 35.0, "degraded": false },
+        { "minuteOffset": 9, "timestamp": "2025-08-14T11:09:00+04:00", "psi": 4.0, "compositeScore": 3.95, "wbgtC": 35.0, "degraded": false }
+      ],
+      "expected": { "status": "ready", "psiNow": 3.95, "slopePerMin": 0.085, "psi15Point": 5.22, "psi30Point": 6.2, "predictedTier15": "Amber", "predictedTier30": "Amber", "projectedAmberCrossingMin": 1 }
+    }
+  ]
+}

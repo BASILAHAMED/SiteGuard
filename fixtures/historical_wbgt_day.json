@@ -1,0 +1,18 @@
+{
+  "dataset": "Abu Dhabi Mussafah Industrial Historical Summer Heatwave (2025-08-14)",
+  "source": "data/uae_heatwave_abu_dhabi.csv",
+  "station": "Abu Dhabi Mussafah Industrial (Historical Record)",
+  "lat": 24.3712,
+  "lon": 54.5097,
+  "uaeMiddayBreakWindow": "12:30-15:00 GST",
+  "observations": [
+    { "hourGst": 6, "timestampIso": "2025-08-14T06:00:00+04:00", "airTempC": 33.8, "relHumidityPct": 64, "windSpeedMs": 2.1, "solarWm2": 65, "wetBulbC": 28.1, "globeTempC": 36.2, "wbgtC": 29.3, "heatIndexC": 45.2 },
+    { "hourGst": 8, "timestampIso": "2025-08-14T08:00:00+04:00", "airTempC": 37.6, "relHumidityPct": 52, "windSpeedMs": 2.6, "solarWm2": 460, "wetBulbC": 28.8, "globeTempC": 45.5, "wbgtC": 32.0, "heatIndexC": 48.6 },
+    { "hourGst": 10, "timestampIso": "2025-08-14T10:00:00+04:00", "airTempC": 42.5, "relHumidityPct": 38, "windSpeedMs": 3.2, "solarWm2": 825, "wetBulbC": 29.1, "globeTempC": 53.4, "wbgtC": 34.1, "heatIndexC": 51.2 },
+    { "hourGst": 11, "timestampIso": "2025-08-14T11:00:00+04:00", "airTempC": 44.4, "relHumidityPct": 34, "windSpeedMs": 3.4, "solarWm2": 930, "wetBulbC": 29.4, "globeTempC": 56.1, "wbgtC": 35.0, "heatIndexC": 52.9 },
+    { "hourGst": 12, "timestampIso": "2025-08-14T12:00:00+04:00", "airTempC": 45.8, "relHumidityPct": 32, "windSpeedMs": 3.6, "solarWm2": 975, "wetBulbC": 29.8, "globeTempC": 57.8, "wbgtC": 35.8, "heatIndexC": 54.6 },
+    { "hourGst": 13, "timestampIso": "2025-08-14T13:00:00+04:00", "airTempC": 46.7, "relHumidityPct": 30, "windSpeedMs": 3.8, "solarWm2": 955, "wetBulbC": 29.9, "globeTempC": 58.5, "wbgtC": 36.1, "heatIndexC": 55.2 },
+    { "hourGst": 14, "timestampIso": "2025-08-14T14:00:00+04:00", "airTempC": 47.1, "relHumidityPct": 29, "windSpeedMs": 4.1, "solarWm2": 880, "wetBulbC": 29.8, "globeTempC": 57.9, "wbgtC": 36.0, "heatIndexC": 55.1 },
+    { "hourGst": 15, "timestampIso": "2025-08-14T15:00:00+04:00", "airTempC": 46.2, "relHumidityPct": 32, "windSpeedMs": 4.3, "solarWm2": 745, "wetBulbC": 30.1, "globeTempC": 55.6, "wbgtC": 35.8, "heatIndexC": 55.0 }
+  ]
+}

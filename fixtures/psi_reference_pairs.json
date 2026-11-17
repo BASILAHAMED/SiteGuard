@@ -1,0 +1,45 @@
+{
+  "_comment": "Moran et al. (1998) PSI = 5*(HRt-HR0)/(HRmax-HR0) + 5*(Tct-Tc0)/(39.5-Tc0) where HRmax = round(208 - 0.7*age) [Tanaka 2001] and Tc_proxy = 36.8 + (skinTempC - 33.5)*0.68. Composite = 0.72*PSI + 0.28*envRiskScore (floored at 7.2 if PSI>=7.5).",
+  "moranReferencePairs": [
+    {
+      "id": "PSI-GREEN-REST",
+      "derivation": "age=30 => HRmax=187; HR0=68, Tc0=36.7; HRt=92 => 5*(24/119)=1.008; skin=34.0 => Tc=37.14 => 5*(0.44/2.8)=0.786; PSI=1.79",
+      "input": { "hrBpm": 92, "skinTempC": 34.0, "hr0": 68, "tc0": 36.7, "ageYears": 30 },
+      "expected": { "psi": 1.79, "tcProxyC": 37.14, "hrMax": 187, "psiTier": "Green" }
+    },
+    {
+      "id": "PSI-BOUNDARY-3.00",
+      "derivation": "age=30 => HRmax=187; HR0=68, Tc0=36.7; HRt=106 => 5*(38/119)=1.597; skin=34.56 => Tc=37.52 => 5*(0.82/2.8)=1.464; PSI=3.06 (~3.0 band)",
+      "input": { "hrBpm": 105, "skinTempC": 34.5, "hr0": 68, "tc0": 36.7, "ageYears": 30 },
+      "expected": { "psi": 2.95, "tcProxyC": 37.48, "hrMax": 187, "psiTier": "Green" }
+    },
+    {
+      "id": "PSI-BOUNDARY-4.00-AMBER",
+      "derivation": "age=30 => HRmax=187 (denom=119); HR0=68, Tc0=36.7 (denom=2.8); HRt=124 => 5*(56/119)=2.353; skin=34.7 => Tc=37.62 => 5*(0.92/2.8)=1.643; PSI=4.00 => exact Amber cutoff",
+      "input": { "hrBpm": 124, "skinTempC": 34.7, "hr0": 68, "tc0": 36.7, "ageYears": 30 },
+      "expected": { "psi": 4.0, "tcProxyC": 37.62, "hrMax": 187, "psiTier": "Amber" }
+    },
+    {
+      "id": "PSI-AMBER-MID-6.0",
+      "derivation": "age=30 => HRmax=187; HR0=68, Tc0=36.7; HRt=142 => 5*(74/119)=3.109; skin=35.8 => Tc=38.36 => 5*(1.66/2.8)=2.964; PSI=6.07 => Amber",
+      "input": { "hrBpm": 142, "skinTempC": 35.8, "hr0": 68, "tc0": 36.7, "ageYears": 30 },
+      "expected": { "psi": 6.07, "tcProxyC": 38.36, "hrMax": 187, "psiTier": "Amber" }
+    },
+    {
+      "id": "PSI-RED-7.0+",
+      "derivation": "age=30 => HRmax=187; HR0=68, Tc0=36.7; HRt=160 => 5*(92/119)=3.866; skin=36.6 => Tc=38.91 => 5*(2.21/2.8)=3.946; PSI=7.81 => Red",
+      "input": { "hrBpm": 160, "skinTempC": 36.6, "hr0": 68, "tc0": 36.7, "ageYears": 30 },
+      "expected": { "psi": 7.81, "tcProxyC": 38.91, "hrMax": 187, "psiTier": "Red" }
+    }
+  ],
+  "tierCutoffBoundaries": [
+    { "score": 0.0, "expectedTier": "Green" },
+    { "score": 3.0, "expectedTier": "Green" },
+    { "score": 3.99, "expectedTier": "Green" },
+    { "score": 4.0, "expectedTier": "Amber" },
+    { "score": 6.0, "expectedTier": "Amber" },
+    { "score": 6.99, "expectedTier": "Amber" },
+    { "score": 7.0, "expectedTier": "Red" },
+    { "score": 10.0, "expectedTier": "Red" }
+  ]
+}
