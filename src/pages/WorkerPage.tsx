@@ -16,11 +16,9 @@ import {
   Thermometer,
   Wrench,
 } from 'lucide-react';
-import { AppCarousel } from '../components/AppCarousel';
 import { SparklineChart } from '../components/SparklineChart';
 import { VoiceIncidentRecorder } from '../components/VoiceIncidentRecorder';
-import { WatchFaceGauge } from '../components/WatchFaceGauge';
-import { WatchShell } from '../components/WatchShell';
+import { SmartWatch } from '../components/watch/SmartWatch';
 import { synthesizeGemma4EdgeObservation } from '../shared/edgeWeatherFallback';
 import { predictCompositeTrajectory } from '../shared/forecastEngine';
 import { assessWorkerHeatRisk } from '../shared/riskEngine';
@@ -198,7 +196,6 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aodMode, setAodMode] = useState(false);
-  const [carouselOpen, setCarouselOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [showBleJson, setShowBleJson] = useState(false);
 
@@ -208,6 +205,16 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const [exertionSlider, setExertionSlider] = useState(6.0);
   const debounceRef = useRef<number | null>(null);
 
+  // Live polling bookkeeping: any user action bumps the sequence so an
+  // in-flight poll that started before it can never overwrite fresher state.
+  const actionSeqRef = useRef(0);
+  const busyRef = useRef(false);
+  const workerStateRef = useRef<WorkerStateSelf | null>(null);
+  const serverBackedRef = useRef(false);
+  const bumpAction = () => {
+    actionSeqRef.current += 1;
+  };
+
   const getActiveOfflineEnv = useCallback(
     () => env ?? synthesizeGemma4EdgeObservation(null, 'Gemma 4 Edge local inference active'),
     [env]
@@ -216,6 +223,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const loadWorkerState = useCallback(
     async (workerId: string) => {
       const applyFallback = () => {
+        serverBackedRef.current = false;
         const offlineEnv = getActiveOfflineEnv();
         const cached = readCachedWorkerState(workerId);
         const edgeState = cached
@@ -244,6 +252,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
             ? recomputeLocalWorkerEdgeState(data.state, env)
             : data.state;
         persistWorkerState(syncedState);
+        serverBackedRef.current = true;
         setWorkerState(syncedState);
         setHrSlider(syncedState.latestFrame.hrBpm);
         setSkinSlider(syncedState.latestFrame.skinTempC);
@@ -273,6 +282,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
 
   const pushBleFrame = async (nextHr: number, nextSkin: number, nextExertion: number) => {
     if (!workerState) return;
+    bumpAction();
+    busyRef.current = true;
     setUpdating(true);
     const payload: BLETelemetryFrame = {
       deviceId: workerState.context.deviceId,
@@ -311,6 +322,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       persistWorkerState(localNext);
       setWorkerState(localNext);
     } finally {
+      bumpAction();
+      busyRef.current = false;
       setUpdating(false);
     }
   };
@@ -327,6 +340,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
 
   const handleFaultToggle = async (faultKey: keyof FaultFlags | 'clear_all', active: boolean) => {
     if (!workerState) return;
+    bumpAction();
+    busyRef.current = true;
     setUpdating(true);
     try {
       const res = await fetch(`/api/worker/${workerState.context.workerId}/fault`, {
@@ -355,12 +370,16 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       persistWorkerState(localNext);
       setWorkerState(localNext);
     } finally {
+      bumpAction();
+      busyRef.current = false;
       setUpdating(false);
     }
   };
 
   const handleLanguageChange = async (language: SupportedLanguage) => {
     if (!workerState) return;
+    bumpAction();
+    busyRef.current = true;
     setUpdating(true);
     try {
       const res = await fetch(`/api/worker/${workerState.context.workerId}/language`, {
@@ -380,6 +399,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       persistWorkerState(localNext);
       setWorkerState(localNext);
     } finally {
+      bumpAction();
+      busyRef.current = false;
       setUpdating(false);
     }
   };
@@ -388,6 +409,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
 
   const handleCheckIn = async (status: 'okay' | 'help') => {
     if (!workerState) return;
+    bumpAction();
+    busyRef.current = true;
     setCheckInSending(status);
     setError(null);
     try {
@@ -414,12 +437,16 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       persistWorkerState(localNext);
       setWorkerState(localNext);
     } finally {
+      bumpAction();
+      busyRef.current = false;
       setCheckInSending(null);
     }
   };
 
   const handleSimStep = async (action: 'step_3m' | 'step_6m' | 'reset_cool') => {
     if (!workerState) return;
+    bumpAction();
+    busyRef.current = true;
     setUpdating(true);
     try {
       const res = await fetch(`/api/worker/${workerState.context.workerId}/sim-step`, {
@@ -469,9 +496,42 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       setSkinSlider(localNext.latestFrame.skinTempC);
       setExertionSlider(localNext.latestFrame.exertionIndex);
     } finally {
+      bumpAction();
+      busyRef.current = false;
       setUpdating(false);
     }
   };
+
+  workerStateRef.current = workerState;
+
+  // Live sync: poll the worker state every 3 s so supervisor directives,
+  // other-tab changes and server-side updates reach the watch without a click.
+  useEffect(() => {
+    const id = window.setInterval(async () => {
+      const cur = workerStateRef.current;
+      if (!cur || busyRef.current || !serverBackedRef.current) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      const seq = actionSeqRef.current;
+      try {
+        const res = await fetch(`/api/worker/${cur.context.workerId}/state`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = (await res.json()) as { state: WorkerStateSelf };
+        const latest = workerStateRef.current;
+        if (seq !== actionSeqRef.current || busyRef.current || !latest) return;
+        if (data.state.context.workerId !== latest.context.workerId) return;
+        // Serverless instances can lag: never step backwards in telemetry time.
+        if (Date.parse(data.state.latestFrame.timestamp) < Date.parse(latest.latestFrame.timestamp)) return;
+        const next = env?.edgeOfflineActive ? recomputeLocalWorkerEdgeState(data.state, env) : data.state;
+        if (JSON.stringify(next) === JSON.stringify(latest)) return;
+        persistWorkerState(next);
+        setWorkerState(next);
+      } catch {
+        /* transient — next tick retries */
+      }
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [env]);
 
   if (loading && !workerState) {
     return (
@@ -539,21 +599,15 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* LEFT COLUMN: PRIMARY CIRCULAR WATCH FACE + CHECK-IN + VOICE INCIDENT */}
         <section className="lg:col-span-5 space-y-4">
-          <WatchShell
+          <SmartWatch
+            workerState={workerState}
             aodMode={aodMode}
-            onCrownTap={() => setCarouselOpen(true)}
-            onSideButtonHold={() => handleCheckIn('help')}
-          >
-            {carouselOpen ? (
-              <AppCarousel workerState={workerState} onClose={() => setCarouselOpen(false)} />
-            ) : (
-              <WatchFaceGauge
-                workerState={workerState}
-                aodMode={aodMode}
-                onToggleAod={() => setAodMode((v) => !v)}
-              />
-            )}
-          </WatchShell>
+            onAodChange={setAodMode}
+            onCheckIn={handleCheckIn}
+            checkInSending={checkInSending}
+            onLanguageChange={handleLanguageChange}
+            tempUnit={tempUnit}
+          />
 
           {/* Worker Actions & Voice Safety Reporting Shell */}
           <div className="bg-[#0B1120] text-slate-100 rounded-2xl border border-slate-800 p-5 shadow-sm">

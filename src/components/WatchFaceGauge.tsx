@@ -102,9 +102,9 @@ export function WatchFaceGauge({ workerState, aodMode, onToggleAod }: WatchFaceG
     return (
       <div
         data-testid="watchface-aod"
-        className="relative flex flex-col items-center justify-center rounded-[28px] bg-black border border-neutral-800 px-6 py-6 text-neutral-300 select-none"
+        className="relative h-full flex flex-col items-center justify-center bg-black px-7 pt-6 pb-5 text-neutral-300 select-none"
       >
-        <div className="w-full flex items-center justify-between text-[11px] font-mono tabular-nums text-neutral-500 mb-2">
+        <div className="w-full flex items-center justify-between px-6 text-[11px] font-mono tabular-nums text-neutral-500 mb-2">
           <span>AOD · LOW POWER</span>
           <span>T+{simulatedClockMin}m</span>
         </div>
@@ -162,7 +162,7 @@ export function WatchFaceGauge({ workerState, aodMode, onToggleAod }: WatchFaceG
           </text>
         </svg>
 
-        <div className="mt-2 w-full flex items-center justify-between gap-3 pt-3 border-t border-neutral-900">
+        <div className="mt-2 w-full flex items-center justify-between gap-3 pt-3 px-3 border-t border-neutral-900">
           <span className="text-[11px] font-mono text-neutral-500 truncate">
             {anyFaultActive ? bottomMicroLabel : `${context.deviceId} · AOD`}
           </span>
@@ -220,18 +220,28 @@ export function WatchFaceGauge({ workerState, aodMode, onToggleAod }: WatchFaceG
     <div
       data-testid="watchface-active"
       data-fault-degraded={anyFaultActive ? 'true' : 'false'}
-      className="relative flex flex-col items-center rounded-[28px] bg-[#0B1120] border-2 border-slate-800 px-6 py-5 text-slate-100 shadow-lg"
+      className="relative h-full flex flex-col items-center bg-black px-6 pt-6 pb-5 text-slate-100"
     >
       {/* Top Micro-Overlays: Simulated Clock Time (secondary) & Battery % */}
-      <div className="w-full flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-400">
+      <div className="w-full flex items-center justify-between px-7 text-[11px] font-mono tabular-nums text-slate-400">
         <span>T+{simulatedClockMin}m</span>
+        <span
+          data-testid="face-hr"
+          className="flex items-center gap-1 text-rose-300"
+          title="Heart rate from latest BLE frame"
+        >
+          <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current" aria-hidden>
+            <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z" />
+          </svg>
+          {faults.bleDisconnected ? '--' : latestFrame.hrBpm}
+        </span>
         <span className={faults.lowBattery ? 'text-amber-300 font-semibold' : ''}>
           BAT {latestFrame.batteryPct}%
         </span>
       </div>
 
       {/* Circular 240° Watch Dial */}
-      <div className="relative w-full max-w-[320px] flex flex-col items-center mt-1">
+      <div className="relative w-full max-w-[292px] flex flex-col items-center -mt-1">
         <svg
           viewBox="0 0 320 278"
           className="w-full h-auto overflow-visible"
@@ -402,10 +412,11 @@ export function WatchFaceGauge({ workerState, aodMode, onToggleAod }: WatchFaceG
       </div>
 
       {/* Bottom Micro-Label & Simulate AOD Control */}
-      <div className="mt-2 w-full flex items-center justify-between gap-2 pt-3 border-t border-slate-800">
+      <div className="mt-auto w-full flex items-center justify-between gap-2 pt-2.5 px-3 border-t border-slate-800/80">
         <div
           data-testid="watchface-bottom-label"
-          className={`text-[11px] font-mono leading-tight ${
+          title={bottomMicroLabel}
+          className={`min-w-0 truncate text-[10.5px] font-mono leading-tight ${
             anyFaultActive ? 'text-amber-300 font-semibold' : 'text-slate-400'
           }`}
         >
