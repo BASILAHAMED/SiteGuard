@@ -1,0 +1,338 @@
+import 'dotenv/config';
+import express from 'express';
+import {
+  generateDeterministicSyntheticCohort,
+  runBacktest,
+  runProspectiveForecastValidation,
+} from '../shared/cohortAndValidation.ts';
+import type {
+  BLETelemetryFrame,
+  FaultFlags,
+  SupportedLanguage,
+  SyntheticWorkerDay,
+  VoiceIncidentSeverity,
+} from '../shared/types.ts';
+import { HISTORICAL_UAE_HEATWAVE_CURVE } from '../shared/uaeWeatherData.ts';
+import {
+  generateComplianceNarrative,
+  generateSyntheticCohortViaGemini,
+  getLastGeminiDiagnostic,
+  transcribeWorkerVoiceIncident,
+} from './geminiService.ts';
+import { siteGuardStore } from './store.ts';
+
+// Cached validation cohort (defaults to deterministic calibrated cohort; can be regenerated via Gemini)
+let activeValidationCohort: SyntheticWorkerDay[] = generateDeterministicSyntheticCohort(24, 202608);
+
+/**
+ * Builds the fully-configured SiteGuard Express app (all API routes
+ * registered) WITHOUT starting a listener and WITHOUT the dev/prod static
+ * serving branch -- those are environment-specific (long-running Node
+ * process for local/Cloud Run via server.ts, vs. Vercel serverless via
+ * api/index.ts which lets Vercel's own CDN serve the static build output).
+ *
+ * IMPORTANT (Vercel serverless deploys): `activeValidationCohort` and
+ * everything inside `siteGuardStore` is in-memory, module-level state.
+ * On a long-running Node process (local dev, Cloud Run / AI Studio) this
+ * persists naturally across requests. On Vercel serverless, each
+ * invocation MAY run on a different/cold instance, so stateful demo
+ * actions (fault toggle, check-in, BLE telemetry push, sim-step) can
+ * appear to "reset" between requests that don't land on the same warm
+ * instance. This is a known, documented limitation of lifting a
+ * stateful-in-memory Express app onto serverless as-is -- acceptable for
+ * a live demo/showcase, not a drop-in replacement for the Cloud Run
+ * deployment without a real shared store (e.g. a hosted Postgres/KV).
+ */
+export function createApp(): express.Express {
+  const app = express();
+  app.use(express.json({ limit: '6mb' }));
+
+  // ── Environmental Feed Endpoints ─────────────────────────────────────────────
+  app.get('/api/environment', (_req, res) => {
+    res.json({
+      current: siteGuardStore.getEnvironment(),
+      heatwaveCurve: HISTORICAL_UAE_HEATWAVE_CURVE,
+    });
+  });
+
+  app.get('/api/environment/live', async (req, res) => {
+    const simParam = req.query.simulateOffline;
+    const simulateOffline =
+      simParam === 'true' ? true : simParam === 'false' ? false : undefined;
+    const env = await siteGuardStore.fetchLiveAbuDhabiWeather({ simulateOffline });
+    res.json({
+      current: env,
+      heatwaveCurve: HISTORICAL_UAE_HEATWAVE_CURVE,
+    });
+  });
+
+  app.post('/api/environment/mode', async (req, res) => {
+    try {
+      const { mode, hourGst, simulateOffline } = (req.body ?? {}) as {
+        mode?: 'historical_heatwave' | 'live_abu_dhabi';
+        hourGst?: number;
+        simulateOffline?: boolean;
+      };
+      const env =
+        mode === 'live_abu_dhabi'
+          ? await siteGuardStore.fetchLiveAbuDhabiWeather({ simulateOffline })
+          : siteGuardStore.setHistoricalHour(typeof hourGst === 'number' ? hourGst : 11);
+      res.json({ current: env, heatwaveCurve: HISTORICAL_UAE_HEATWAVE_CURVE });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Worker & Hardware-Agnostic BLE Wearable API ──────────────────────────────
+  app.get('/api/workers', (_req, res) => {
+    res.json({ workers: siteGuardStore.listWorkerIds() });
+  });
+
+  const isSupervisorToken = (req: express.Request): boolean => {
+    const roleHeader = String(req.headers['x-siteguard-role'] ?? '').toLowerCase();
+    const authHeader = String(req.headers.authorization ?? '').toLowerCase();
+    const roleQuery = String(req.query.role ?? '').toLowerCase();
+    return roleHeader === 'supervisor' || authHeader.includes('supervisor') || roleQuery === 'supervisor';
+  };
+
+  app.get('/api/worker/:id/state', async (req, res) => {
+    if (isSupervisorToken(req)) {
+      res.status(403).json({
+        error: 'Forbidden: supervisor-role sessions cannot access raw worker physiological vitals.',
+        redacted: true,
+        allowedEndpoint: '/api/supervisor/crew',
+      });
+      return;
+    }
+    try {
+      const state = await siteGuardStore.getWorkerState(req.params.id);
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json({ state, env: siteGuardStore.getEnvironment() });
+    } catch (err) {
+      res.status(404).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
+   * Hardware-Agnostic BLE Wearable Telemetry Endpoint.
+   * Identical contract for the UI simulator slider panel and physical BLE gateways.
+   */
+  app.post('/api/ble/telemetry', async (req, res) => {
+    try {
+      const frame = req.body as BLETelemetryFrame;
+      if (!frame || !frame.workerId || typeof frame.hrBpm !== 'number') {
+        res.status(400).json({ error: 'Invalid BLETelemetryFrame payload' });
+        return;
+      }
+      const state = await siteGuardStore.ingestBleTelemetry(frame);
+      res.json({ state, env: siteGuardStore.getEnvironment() });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/worker/:id/fault', async (req, res) => {
+    try {
+      const { faultKey, active } = req.body as {
+        faultKey: keyof FaultFlags | 'clear_all';
+        active: boolean;
+      };
+      const state = await siteGuardStore.setWorkerFault(req.params.id, faultKey, Boolean(active));
+      res.json({ state, env: siteGuardStore.getEnvironment() });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/worker/:id/language', async (req, res) => {
+    try {
+      const { language } = req.body as { language: SupportedLanguage };
+      const state = await siteGuardStore.setWorkerLanguage(req.params.id, language);
+      res.json({ state });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/worker/:id/checkin', (req, res) => {
+    try {
+      const { status } = req.body as { status: 'okay' | 'help' };
+      const state = siteGuardStore.recordWorkerCheckIn(req.params.id, status);
+      res.json({ state });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/worker/:id/voice-report', async (req, res) => {
+    try {
+      const { audioBase64, mimeType, transcript, language, severity } = (req.body ?? {}) as {
+        audioBase64?: string;
+        mimeType?: string;
+        transcript?: string;
+        language?: SupportedLanguage;
+        severity?: VoiceIncidentSeverity;
+      };
+      if (!audioBase64 && (!transcript || !transcript.trim())) {
+        res.status(400).json({ error: 'Provide either recorded audio or a spoken/typed incident note.' });
+        return;
+      }
+      const transcribed = await transcribeWorkerVoiceIncident({
+        audioBase64,
+        mimeType,
+        language,
+        fallbackTranscript: transcript,
+      });
+      const recorded = siteGuardStore.recordVoiceIncident(req.params.id, {
+        transcript: transcribed.transcript,
+        language: language ?? 'en',
+        source: transcribed.source,
+        severity,
+      });
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json({
+        state: recorded.state,
+        incident: recorded.incident,
+        transcript: transcribed.transcript,
+        source: transcribed.source,
+        severity: recorded.selectedSeverity,
+      });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/worker/:id/sim-step', async (req, res) => {
+    try {
+      const { action } = req.body as { action: 'step_3m' | 'step_6m' | 'reset_cool' };
+      const state = await siteGuardStore.stepSimulatedClock(req.params.id, action);
+      res.json({ state, env: siteGuardStore.getEnvironment() });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── Privacy-Enforced Supervisor Endpoints ────────────────────────────────────
+  // Architecturally strips raw physiological vitals (hrBpm, skinTempC, exertionIndex, hr0, tc0)
+  app.get('/api/supervisor/crew', (_req, res) => {
+    res.json(siteGuardStore.getSupervisorSnapshot());
+  });
+
+  app.post('/api/supervisor/action', (req, res) => {
+    try {
+      const { workerId, action } = req.body as {
+        workerId: string;
+        action: 'acknowledge' | 'order_break' | 'escalate' | 'apply_rotation';
+      };
+      const snapshot = siteGuardStore.performSupervisorAction(workerId, action);
+      res.json(snapshot);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  app.get('/api/supervisor/alert-policy', (_req, res) => {
+    res.json({ policy: siteGuardStore.getAlertPolicy() });
+  });
+
+  app.put('/api/supervisor/alert-policy', (req, res) => {
+    try {
+      const policy = siteGuardStore.updateAlertPolicy(req.body ?? {});
+      const snapshot = siteGuardStore.getSupervisorSnapshot();
+      res.json({ policy, snapshot });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  // ── UAE Midday Break Compliance Endpoints ────────────────────────────────────
+  app.get('/api/compliance/report', (_req, res) => {
+    res.json(siteGuardStore.getComplianceReport());
+  });
+
+  app.post('/api/compliance/narrative', async (req, res) => {
+    try {
+      const { insurerRef } = (req.body ?? {}) as { insurerRef?: string };
+      const report = siteGuardStore.getComplianceReport();
+      const result = await generateComplianceNarrative({
+        siteName: report.siteName,
+        env: report.env,
+        breaks: report.breaks,
+        incidents: report.incidents,
+        insurerRef: insurerRef ?? 'MOHRE-AUH-2026-07',
+      });
+      const saved = siteGuardStore.setComplianceNarrative(result.narrative, result.source);
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json(saved);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/system/reset', (req, res) => {
+    const { scenario } = (req.body ?? {}) as { scenario?: 'default' | 'zero_violations' };
+    siteGuardStore.resetScenario(scenario === 'zero_violations' ? 'zero_violations' : 'default');
+    res.json({ ok: true, scenario: scenario ?? 'default' });
+  });
+
+  // ── Backtest & Prospective Forecast Validation Endpoints ─────────────────────
+  app.get('/api/validation/backtest', (_req, res) => {
+    const report = runBacktest(activeValidationCohort);
+    res.json({
+      report,
+      cohortMetadata: {
+        source: 'SYNTHETIC_PHYSIOLOGICAL_COHORT',
+        generator: activeValidationCohort[0]?.generator ?? 'deterministic_calibrated',
+        count: activeValidationCohort.length,
+      },
+    });
+  });
+
+  app.post('/api/validation/generate-cohort', async (req, res) => {
+    try {
+      const { mode, count } = (req.body ?? {}) as {
+        mode?: 'gemini' | 'deterministic';
+        count?: number;
+      };
+      const n = Math.max(8, Math.min(36, count ?? 16));
+      if (mode === 'gemini') {
+        const gem = await generateSyntheticCohortViaGemini(n);
+        if (gem.cohort.length >= 6) {
+          activeValidationCohort = gem.cohort;
+        } else {
+          activeValidationCohort = generateDeterministicSyntheticCohort(n, Date.now() % 100000);
+        }
+      } else {
+        activeValidationCohort = generateDeterministicSyntheticCohort(n, 202608);
+      }
+
+      const backtest = runBacktest(activeValidationCohort);
+      const forecastValidation = runProspectiveForecastValidation(activeValidationCohort);
+      res.json({
+        backtest,
+        forecastValidation,
+        cohortMetadata: {
+          source: 'SYNTHETIC_PHYSIOLOGICAL_COHORT',
+          generator: activeValidationCohort[0]?.generator ?? 'deterministic_calibrated',
+          count: activeValidationCohort.length,
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.get('/api/validation/forecast', (_req, res) => {
+    const report = runProspectiveForecastValidation(activeValidationCohort);
+    res.json({
+      report,
+      cohortMetadata: {
+        source: 'SYNTHETIC_PHYSIOLOGICAL_COHORT',
+        generator: activeValidationCohort[0]?.generator ?? 'deterministic_calibrated',
+        count: activeValidationCohort.length,
+      },
+    });
+  });
+
+  return app;
+}
