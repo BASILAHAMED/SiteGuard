@@ -16,9 +16,11 @@ import {
   Thermometer,
   Wrench,
 } from 'lucide-react';
+import { AppCarousel } from '../components/AppCarousel';
 import { SparklineChart } from '../components/SparklineChart';
 import { VoiceIncidentRecorder } from '../components/VoiceIncidentRecorder';
 import { WatchFaceGauge } from '../components/WatchFaceGauge';
+import { WatchShell } from '../components/WatchShell';
 import { synthesizeGemma4EdgeObservation } from '../shared/edgeWeatherFallback';
 import { predictCompositeTrajectory } from '../shared/forecastEngine';
 import { assessWorkerHeatRisk } from '../shared/riskEngine';
@@ -196,6 +198,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aodMode, setAodMode] = useState(false);
+  const [carouselOpen, setCarouselOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [showBleJson, setShowBleJson] = useState(false);
 
@@ -536,11 +539,21 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* LEFT COLUMN: PRIMARY CIRCULAR WATCH FACE + CHECK-IN + VOICE INCIDENT */}
         <section className="lg:col-span-5 space-y-4">
-          <WatchFaceGauge
-            workerState={workerState}
+          <WatchShell
             aodMode={aodMode}
-            onToggleAod={() => setAodMode((v) => !v)}
-          />
+            onCrownTap={() => setCarouselOpen(true)}
+            onSideButtonHold={() => handleCheckIn('help')}
+          >
+            {carouselOpen ? (
+              <AppCarousel workerState={workerState} onClose={() => setCarouselOpen(false)} />
+            ) : (
+              <WatchFaceGauge
+                workerState={workerState}
+                aodMode={aodMode}
+                onToggleAod={() => setAodMode((v) => !v)}
+              />
+            )}
+          </WatchShell>
 
           {/* Worker Actions & Voice Safety Reporting Shell */}
           <div className="bg-[#0B1120] text-slate-100 rounded-2xl border border-slate-800 p-5 shadow-sm">
