@@ -88,12 +88,20 @@ export function WatchShell({ children, aodMode, onCrownTap, onSideButtonHold }: 
           }}
         />
 
-        {/* Screen */}
+        {/* Screen — FIXED size so swapping face<->carousel never resizes the
+            case; carousel content scrolls internally instead of expanding it. */}
         <div
           data-testid="watch-screen"
-          className={`rounded-[48px] overflow-hidden border-[3px] border-black transition-[filter] duration-500 ${
+          className={`rounded-[48px] border-[3px] border-black transition-[filter] duration-500 ${
             aodMode ? 'grayscale brightness-[0.55]' : ''
           }`}
+          style={{
+            width: 352,
+            height: 424,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            scrollbarWidth: 'none',
+          }}
         >
           {children}
         </div>

@@ -78,7 +78,7 @@ export function CompliancePage() {
   if (loading && !report) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
-        <div className="h-96 bg-slate-200/70 rounded-xl animate-pulse" />
+        <div className="h-96 bg-white/10 rounded-xl animate-pulse" />
       </main>
     );
   }
@@ -95,17 +95,17 @@ export function CompliancePage() {
       {/* Header + Export Controls */}
       <div className="no-print flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
             UAE Midday Working Break Compliance Report
           </h1>
-          <p className="text-sm text-slate-600 mt-1">{report.regulationReference}</p>
+          <p className="text-sm text-slate-400 mt-1">{report.regulationReference}</p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={handleDownloadJson}
-            className="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="px-3.5 py-2 text-xs font-semibold bg-[#141821] border border-white/10 rounded-lg text-slate-200 hover:bg-white/5 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Regulator JSON</span>
@@ -113,7 +113,7 @@ export function CompliancePage() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="px-4 py-2 text-xs font-semibold bg-[#787aff] text-white rounded-lg hover:bg-[#6366f1] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Export PDF</span>
@@ -122,18 +122,18 @@ export function CompliancePage() {
       </div>
 
       {/* Printable Report Sheet */}
-      <div className="print-container bg-white border border-slate-200 rounded-xl p-6 sm:p-8 space-y-8">
+      <div className="print-container bg-[#141821] border border-white/10 rounded-xl p-6 sm:p-8 space-y-8">
         {/* Report Masthead */}
-        <div className="flex flex-wrap items-start justify-between gap-6 pb-6 border-b border-slate-200">
+        <div className="flex flex-wrap items-start justify-between gap-6 pb-6 border-b border-white/10">
           <div>
-            <div className="text-xs font-mono text-slate-500">
+            <div className="text-xs font-mono text-slate-400">
               SITEGUARD COMPLIANCE RECORD · GENOS TEAM
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">{report.siteName}</h2>
-            <p className="text-xs text-slate-600 mt-1">
+            <h2 className="text-xl font-bold text-white mt-1">{report.siteName}</h2>
+            <p className="text-xs text-slate-400 mt-1">
               {report.emirate} · Mandatory Break Window: 12:30–15:00 GST (June 15 – September 15) ·{' '}
               Current Window Status:{' '}
-              <strong className="text-slate-900">
+              <strong className="text-white">
                 {report.env.inUaeMiddayBreakWindow ? 'ACTIVE MIDDAY HALT WINDOW' : 'PRE/POST WINDOW'}
               </strong>
             </p>
@@ -141,16 +141,16 @@ export function CompliancePage() {
 
           <div className="grid grid-cols-3 gap-6 text-right font-mono tabular-nums">
             <div>
-              <div className="text-[11px] text-slate-500">Break Compliance</div>
-              <div className="text-2xl font-bold text-slate-900">{report.compliantPct}%</div>
+              <div className="text-[11px] text-slate-400">Break Compliance</div>
+              <div className="text-2xl font-bold text-white">{report.compliantPct}%</div>
             </div>
             <div>
-              <div className="text-[11px] text-slate-500">Red Stop-Work</div>
-              <div className="text-2xl font-bold text-rose-700">{redCount}</div>
+              <div className="text-[11px] text-slate-400">Red Stop-Work</div>
+              <div className="text-2xl font-bold text-rose-400">{redCount}</div>
             </div>
             <div>
-              <div className="text-[11px] text-slate-500">Sensor Fallbacks</div>
-              <div className="text-2xl font-bold text-amber-700">{degradedCount}</div>
+              <div className="text-[11px] text-slate-400">Sensor Fallbacks</div>
+              <div className="text-2xl font-bold text-amber-400">{degradedCount}</div>
             </div>
           </div>
         </div>
@@ -160,8 +160,8 @@ export function CompliancePage() {
           role="status"
           className={`rounded-lg border px-4 py-3 text-xs font-medium ${
             report.compliantPct === 100 && redCount === 0
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-amber-50 border-amber-200 text-amber-900'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
           }`}
         >
           {report.compliantPct === 100 && redCount === 0
@@ -171,13 +171,13 @@ export function CompliancePage() {
 
         {/* Insurer / Regulator Export Metadata Fields */}
         <section>
-          <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-slate-500" />
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-slate-400" />
             <span>Insurer &amp; Regulator Export Metadata</span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="mohre-id" className="block text-xs font-medium text-slate-600 mb-1">
+              <label htmlFor="mohre-id" className="block text-xs font-medium text-slate-400 mb-1">
                 Employer / MOHRE Establishment ID
               </label>
               <input
@@ -185,11 +185,11 @@ export function CompliancePage() {
                 type="text"
                 value={mohreId}
                 onChange={(e) => setMohreId(e.target.value)}
-                className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                className="w-full px-3 py-2 text-sm font-mono bg-white/5 border border-white/10 rounded-lg text-white"
               />
             </div>
             <div>
-              <label htmlFor="recipient" className="block text-xs font-medium text-slate-600 mb-1">
+              <label htmlFor="recipient" className="block text-xs font-medium text-slate-400 mb-1">
                 Insurer / Regulator Export Recipient
               </label>
               <input
@@ -197,11 +197,11 @@ export function CompliancePage() {
                 type="text"
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white"
               />
             </div>
             <div>
-              <label htmlFor="permit-ref" className="block text-xs font-medium text-slate-600 mb-1">
+              <label htmlFor="permit-ref" className="block text-xs font-medium text-slate-400 mb-1">
                 Site Permit &amp; Policy Reference
               </label>
               <input
@@ -209,20 +209,20 @@ export function CompliancePage() {
                 type="text"
                 value={permitRef}
                 onChange={(e) => setPermitRef(e.target.value)}
-                className="w-full px-3 py-2 text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
+                className="w-full px-3 py-2 text-sm font-mono bg-white/5 border border-white/10 rounded-lg text-white"
               />
             </div>
           </div>
         </section>
 
         {/* Gemini Plain-Language Executive Narrative */}
-        <section className="pt-6 border-t border-slate-200">
+        <section className="pt-6 border-t border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900">
+              <h3 className="text-sm font-semibold text-white">
                 Site Manager Executive Narrative
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-400">
                 Plain-language compliance briefing generated by Gemini without personal worker vitals.
               </p>
             </div>
@@ -230,7 +230,7 @@ export function CompliancePage() {
               type="button"
               disabled={generatingNarrative}
               onClick={handleGenerateNarrative}
-              className="no-print px-3.5 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-60 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              className="no-print px-3.5 py-2 text-xs font-semibold bg-[#787aff] text-white rounded-lg hover:bg-[#6366f1] disabled:opacity-60 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>{generatingNarrative ? 'Generating...' : 'Generate Summary with Gemini'}</span>
@@ -238,29 +238,29 @@ export function CompliancePage() {
           </div>
 
           {report.cachedNarrative ? (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-800 leading-relaxed">
+            <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-sm text-slate-200 leading-relaxed">
               <p>{report.cachedNarrative.narrative}</p>
-              <div className="mt-2 text-[11px] font-mono text-slate-500">
+              <div className="mt-2 text-[11px] font-mono text-slate-400">
                 Source: {report.cachedNarrative.source === 'gemini' ? 'Gemini 4 Hydrogen' : 'Compliance Template'} ·{' '}
                 Generated {new Date(report.cachedNarrative.updatedAt).toLocaleTimeString()}
               </div>
             </div>
           ) : (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-500">
+            <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-xs text-slate-400">
               Click &quot;Generate Summary with Gemini&quot; to produce an auditor-ready plain-language compliance narrative for {recipient}.
             </div>
           )}
         </section>
 
         {/* Breaks Taken vs UAE Midday Break Window */}
-        <section className="pt-6 border-t border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3">
+        <section className="pt-6 border-t border-white/10">
+          <h3 className="text-sm font-semibold text-white mb-3">
             Today&apos;s Rest Breaks vs. UAE Midday Working Break Requirement
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                <tr className="border-b border-white/10 text-xs text-slate-400">
                   <th className="py-2.5 pr-4 font-medium">Anonymized Unit</th>
                   <th className="py-2.5 pr-4 font-medium">Zone</th>
                   <th className="py-2.5 pr-4 font-medium">Required Midday Window</th>
@@ -269,29 +269,29 @@ export function CompliancePage() {
                   <th className="py-2.5 font-medium text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/5">
                 {report.breaks.map((b) => (
                   <tr key={b.workerId}>
-                    <td className="py-2.5 pr-4 font-medium text-slate-900">
+                    <td className="py-2.5 pr-4 font-medium text-white">
                       {b.workerId} · {b.roleLabel}
                     </td>
-                    <td className="py-2.5 pr-4 text-xs text-slate-600">{b.zone}</td>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-600">
+                    <td className="py-2.5 pr-4 text-xs text-slate-400">{b.zone}</td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-slate-400">
                       {b.requiredMiddayWindow}
                     </td>
-                    <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-900">
+                    <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-white">
                       {b.breaksTakenMin} min
                     </td>
-                    <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-500">
+                    <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-400">
                       {b.requiredMin} min
                     </td>
                     <td
                       className={`py-2.5 text-right text-xs font-semibold ${
                         b.compliant
-                          ? 'text-emerald-700'
+                          ? 'text-emerald-400'
                           : b.status === 'Action Required'
-                            ? 'text-rose-700'
-                            : 'text-amber-700'
+                            ? 'text-rose-400'
+                            : 'text-amber-400'
                       }`}
                     >
                       {b.status}
@@ -304,14 +304,14 @@ export function CompliancePage() {
         </section>
 
         {/* Incident, Near-Miss & Sensor Degradation Log */}
-        <section className="pt-6 border-t border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3">
+        <section className="pt-6 border-t border-white/10">
+          <h3 className="text-sm font-semibold text-white mb-3">
             Incident, Near-Miss &amp; Sensor Degradation Audit Log ({report.incidents.length} Entries)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
+                <tr className="border-b border-white/10 text-slate-400">
                   <th className="py-2 pr-3 font-medium">Timestamp</th>
                   <th className="py-2 pr-3 font-medium">Unit</th>
                   <th className="py-2 pr-3 font-medium">Severity</th>
@@ -319,35 +319,35 @@ export function CompliancePage() {
                   <th className="py-2 font-medium">Action Taken</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/5">
                 {report.incidents.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-4 text-center text-emerald-700 font-medium">
+                    <td colSpan={5} className="py-4 text-center text-emerald-400 font-medium">
                       Zero heat-stress escalations or sensor violations logged for this shift — full compliance recorded.
                     </td>
                   </tr>
                 ) : (
                   report.incidents.map((inc) => (
                     <tr key={inc.id}>
-                      <td className="py-2.5 pr-3 font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                      <td className="py-2.5 pr-3 font-mono tabular-nums text-slate-400 whitespace-nowrap">
                         {new Date(inc.timestamp).toLocaleTimeString()}
                       </td>
-                      <td className="py-2.5 pr-3 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                      <td className="py-2.5 pr-3 font-mono font-semibold text-slate-200 whitespace-nowrap">
                         {inc.workerId}
                       </td>
                       <td
                         className={`py-2.5 pr-3 font-mono font-semibold whitespace-nowrap ${
                           inc.severity === 'Red'
-                            ? 'text-rose-700'
+                            ? 'text-rose-400'
                             : inc.severity === 'Amber'
-                              ? 'text-amber-700'
-                              : 'text-slate-600'
+                              ? 'text-amber-400'
+                              : 'text-slate-400'
                         }`}
                       >
                         {inc.severity}
                       </td>
-                      <td className="py-2.5 pr-3 text-slate-800">{inc.summary}</td>
-                      <td className="py-2.5 text-slate-600">{inc.actionTaken}</td>
+                      <td className="py-2.5 pr-3 text-slate-200">{inc.summary}</td>
+                      <td className="py-2.5 text-slate-400">{inc.actionTaken}</td>
                     </tr>
                   ))
                 )}

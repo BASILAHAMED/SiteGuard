@@ -477,8 +477,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 h-[560px] bg-slate-200/70 rounded-2xl animate-pulse" />
-          <div className="lg:col-span-7 h-[560px] bg-slate-200/70 rounded-xl animate-pulse" />
+          <div className="lg:col-span-5 h-[560px] bg-white/10 rounded-2xl animate-pulse" />
+          <div className="lg:col-span-7 h-[560px] bg-white/10 rounded-xl animate-pulse" />
         </div>
       </main>
     );
@@ -487,7 +487,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   if (error || !workerState) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
-        <div className="bg-white border border-rose-200 rounded-xl p-6 text-sm text-rose-700">
+        <div className="bg-[#141821] border border-rose-500/30 rounded-xl p-6 text-sm text-rose-400">
           {error ?? 'Unable to load worker view.'}
         </div>
       </main>
@@ -504,24 +504,24 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       {/* Page Title & Active Unit Selector */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
             Worker Wearable Safety Display
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-sm text-slate-400 mt-1">
             {context.workerId} · {context.roleLabel} · {context.zone} · {context.ppeLevel} ·{' '}
             {context.acclimatizationDays}d acclimatized
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <label htmlFor="worker-select" className="text-xs font-medium text-slate-600">
+          <label htmlFor="worker-select" className="text-xs font-medium text-slate-400">
             Active Unit
           </label>
           <select
             id="worker-select"
             value={selectedWorkerId}
             onChange={(e) => setSelectedWorkerId(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-900 cursor-pointer"
+            className="bg-[#141821] border border-white/10 rounded-lg px-3 py-2 text-sm font-medium text-white cursor-pointer"
           >
             {(workers.length > 0
               ? workers
@@ -594,7 +594,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 type="button"
                 disabled={checkInSending !== null}
                 onClick={() => handleCheckIn('okay')}
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500/100 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{checkInSending === 'okay' ? 'Sending...' : "I'm Okay"}</span>
@@ -603,7 +603,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 type="button"
                 disabled={checkInSending !== null}
                 onClick={() => handleCheckIn('help')}
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500/100/100 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <OctagonAlert className="w-4 h-4" />
                 <span>{checkInSending === 'help' ? 'Alerting...' : 'Need Help'}</span>
@@ -623,13 +623,13 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
         <section className="lg:col-span-7 space-y-6">
           {/* Degraded Mode Notices */}
           {assessment.scoringMode === 'environment_only_degraded' && (
-            <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900">
+            <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-300">
               <strong className="font-semibold">DEGRADED · ENVIRONMENT-ONLY MODE:</strong>{' '}
               {assessment.degradedReason}. Scoring safely via outdoor WBGT ({formatTemperature(assessment.effectiveWbgtC, tempUnit, 1)} eff.).
             </div>
           )}
           {assessment.gpsDegraded && (
-            <div className="px-4 py-3 rounded-xl bg-slate-100 border border-amber-300 text-xs text-slate-900">
+            <div className="px-4 py-3 rounded-xl bg-white/10 border border-amber-500/40 text-xs text-white">
               <strong className="font-semibold">DEGRADED · GPS SIGNAL LOST:</strong>{' '}
               Zone pinned to last verified beacon ({context.zone}).
             </div>
@@ -643,7 +643,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   Wearable Safety Guidance ({LANGUAGE_LABELS[lang].native})
                 </span>
                 {env?.edgeOfflineActive && (
-                  <span className="px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/15 text-[10px] font-mono text-amber-200">
+                  <span className="px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/100/15 text-[10px] font-mono text-amber-200">
                     Gemma 4 Edge Local Inference
                   </span>
                 )}
@@ -657,7 +657,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                     onClick={() => handleLanguageChange(code)}
                     className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                       lang === code
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-[#787aff] text-white shadow-xs'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
@@ -702,7 +702,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                     <p
                       dir={isRtl ? 'rtl' : 'ltr'}
                       data-testid="proactive-forecast-note"
-                      className="mt-2.5 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/25 rounded-lg px-3 py-2 leading-relaxed"
+                      className="mt-2.5 text-xs text-amber-200 bg-amber-500/100/10 border border-amber-400/25 rounded-lg px-3 py-2 leading-relaxed"
                     >
                       {copy.proactiveForecastNote}
                     </p>
@@ -736,10 +736,10 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
           </div>
 
           {/* Simulated Clock Controls */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                 <span>
                   Advance simulated shift time to watch the watch face forecast &amp; crossing update live:
                 </span>
@@ -749,7 +749,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('step_3m')}
-                  className="px-3 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  className="px-3 py-2 text-xs font-semibold bg-[#787aff] text-white rounded-lg hover:bg-[#6366f1] flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                 >
                   <Play className="w-3.5 h-3.5" />
                   <span>+3 min Step</span>
@@ -758,7 +758,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('step_6m')}
-                  className="px-3 py-2 text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-200 cursor-pointer whitespace-nowrap"
+                  className="px-3 py-2 text-xs font-semibold bg-white/10 text-white border border-white/10 rounded-lg hover:bg-white/15 cursor-pointer whitespace-nowrap"
                 >
                   +6 min Step
                 </button>
@@ -766,7 +766,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('reset_cool')}
-                  className="px-3 py-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  className="px-3 py-2 text-xs font-medium text-slate-300 border border-white/10 rounded-lg hover:bg-white/5 flex items-center gap-1 cursor-pointer whitespace-nowrap"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset Cool</span>
@@ -778,29 +778,29 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       </div>
 
       {/* DEMOTED COLLAPSIBLE DRAWER: DEVELOPER / BLE SIMULATOR (Sliders + Fault Injection) */}
-      <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <section className="bg-[#141821] border border-white/10 rounded-xl overflow-hidden">
         <button
           type="button"
           aria-expanded={simulatorOpen}
           aria-controls="ble-simulator-drawer"
           onClick={() => setSimulatorOpen((v) => !v)}
-          className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-white/5 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <Wrench className="w-4 h-4 text-slate-600 shrink-0" />
+            <Wrench className="w-4 h-4 text-slate-400 shrink-0" />
             <div>
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-white">
                 Developer / BLE Simulator
               </span>
-              <span className="ml-2 text-xs text-slate-500">
+              <span className="ml-2 text-xs text-slate-400">
                 Physiological telemetry sliders, presets, hardware fault injection &amp; BLE JSON contract
               </span>
             </div>
           </div>
           {simulatorOpen ? (
-            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
           )}
         </button>
 
@@ -808,18 +808,18 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
           <div
             id="ble-simulator-drawer"
             data-testid="ble-simulator-drawer"
-            className="p-6 pt-2 border-t border-slate-200 space-y-6"
+            className="p-6 pt-2 border-t border-white/10 space-y-6"
           >
             {/* Physiological Stream Simulator Sliders */}
             <div>
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/5">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-white">
                     Wearable Physiological Simulator
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Simulated stream calibrated to ACGIH/NIOSH thresholds · pushed via{' '}
-                    <code className="font-mono text-slate-700">POST /api/ble/telemetry</code>
+                    <code className="font-mono text-slate-300">POST /api/ble/telemetry</code>
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -831,7 +831,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(4.0);
                       pushBleFrame(96, 34.1, 4.0);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded-md hover:bg-emerald-500/100/15 cursor-pointer"
                   >
                     Normal
                   </button>
@@ -843,7 +843,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(7.2);
                       pushBleFrame(138, 36.0, 7.2);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 rounded-md hover:bg-amber-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-md hover:bg-amber-100 cursor-pointer"
                   >
                     Heat Ramp
                   </button>
@@ -855,7 +855,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(8.8);
                       pushBleFrame(164, 37.2, 8.8);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 rounded-md hover:bg-rose-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/30 rounded-md hover:bg-rose-500/100/100/15 cursor-pointer"
                   >
                     Critical
                   </button>
@@ -866,11 +866,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Heart Rate Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="hr-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Activity className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="hr-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-slate-400" />
                       <span>Heart Rate</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {hrSlider} bpm
                     </span>
                   </div>
@@ -889,11 +889,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Skin Temp Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="skin-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Thermometer className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="skin-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Thermometer className="w-4 h-4 text-slate-400" />
                       <span>Skin Temp</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {formatTemperature(skinSlider, tempUnit, 1)}
                     </span>
                   </div>
@@ -912,11 +912,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Exertion Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="exertion-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Radio className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="exertion-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Radio className="w-4 h-4 text-slate-400" />
                       <span>Exertion (0–10)</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {exertionSlider.toFixed(1)}
                     </span>
                   </div>
@@ -935,13 +935,13 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
             </div>
 
             {/* Fault Injection & Graceful Degradation */}
-            <div className="pt-5 border-t border-slate-100">
+            <div className="pt-5 border-t border-white/5">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-white">
                     Hardware Fault Injection &amp; Graceful Degradation
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Triggering BLE, battery, or sensor noise faults degrades scoring to environment-only WBGT and logs an audit event.
                   </p>
                 </div>
@@ -949,7 +949,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('clear_all', false)}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer whitespace-nowrap"
+                  className="px-3 py-1.5 text-xs font-semibold border border-white/10 rounded-lg text-slate-300 hover:bg-white/5 cursor-pointer whitespace-nowrap"
                 >
                   Clear All Faults
                 </button>
@@ -963,7 +963,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
                     faults.bleDisconnected
                       ? 'bg-rose-600 text-white border-rose-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <BluetoothOff className="w-4 h-4 shrink-0" />
@@ -977,7 +977,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
                     faults.lowBattery
                       ? 'bg-amber-600 text-white border-amber-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <BatteryWarning className="w-4 h-4 shrink-0" />
@@ -991,7 +991,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
                     faults.sensorNoise
                       ? 'bg-amber-600 text-white border-amber-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <Activity className="w-4 h-4 shrink-0" />
@@ -1004,8 +1004,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   onClick={() => handleFaultToggle('gpsLoss', !faults.gpsLoss)}
                   className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
                     faults.gpsLoss
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-white/5 text-slate-200 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   <MapPinOff className="w-4 h-4 shrink-0" />
@@ -1014,11 +1014,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
               </div>
 
               {/* Hardware-Agnostic BLE API Contract Inspector */}
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-white/5">
                 <button
                   type="button"
                   onClick={() => setShowBleJson((v) => !v)}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer"
+                  className="text-xs font-medium text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer"
                 >
                   <Code2 className="w-3.5 h-3.5" />
                   <span>

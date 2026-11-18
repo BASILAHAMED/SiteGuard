@@ -177,7 +177,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+      <div className="min-h-screen flex flex-col bg-white/5 text-white">
         <TopNav
           env={env}
           onChangeEnvMode={handleChangeEnvMode}
@@ -199,8 +199,8 @@ export default function App() {
           </Routes>
         </div>
 
-        <footer className="no-print border-t border-slate-200 bg-white mt-12">
-          <div className="max-w-[1280px] mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
+        <footer className="no-print border-t border-white/10 bg-[#141821] mt-12">
+          <div className="max-w-[1280px] mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
             <span>SiteGuard by GenOS Team · Future Health Digital Innovation Challenge 07</span>
             <span>
               Moran et al. (1998) PSI + ACGIH WBGT TLV · UAE Ministerial Resolution No. 44 (12:30–15:00 GST)

@@ -51,7 +51,7 @@ export function ValidationPage() {
   if (loading && !data) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
-        <div className="h-96 bg-slate-200/70 rounded-xl animate-pulse" />
+        <div className="h-96 bg-white/10 rounded-xl animate-pulse" />
       </main>
     );
   }
@@ -64,11 +64,11 @@ export function ValidationPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
             Historical Heat-Wave Backtest Validation
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Cohort Source: <span className="font-mono text-xs font-semibold text-slate-800">{cohortMetadata.source}</span> ·{' '}
+          <p className="text-sm text-slate-400 mt-1">
+            Cohort Source: <span className="font-mono text-xs font-semibold text-slate-200">{cohortMetadata.source}</span> ·{' '}
             Generator: {cohortMetadata.generator === 'gemini_synthesized' ? 'Gemini Synthesized' : 'Calibrated Physiological Model'} ·{' '}
             {report.cohortSize} worker-days ({report.totalMinutesEvaluated} simulated minutes)
           </p>
@@ -79,7 +79,7 @@ export function ValidationPage() {
             type="button"
             disabled={regenerating}
             onClick={() => handleRegenerate('deterministic')}
-            className="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-800 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="px-3.5 py-2 text-xs font-semibold bg-[#141821] border border-white/10 rounded-lg text-slate-200 hover:bg-white/5 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Calibrated Cohort (24d)</span>
@@ -88,7 +88,7 @@ export function ValidationPage() {
             type="button"
             disabled={regenerating}
             onClick={() => handleRegenerate('gemini')}
-            className="px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-60 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="px-4 py-2 text-xs font-semibold bg-[#787aff] text-white rounded-lg hover:bg-[#6366f1] disabled:opacity-60 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>{regenerating ? 'Synthesizing...' : 'Synthesize Cohort via Gemini'}</span>
@@ -98,72 +98,72 @@ export function ValidationPage() {
 
       {/* Primary Empirical Metrics Strip */}
       <section className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Mean Alert Lead Time</div>
-          <div className="text-3xl font-mono tabular-nums font-bold text-slate-900 mt-1">
+        <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
+          <div className="text-xs text-slate-400">Mean Alert Lead Time</div>
+          <div className="text-3xl font-mono tabular-nums font-bold text-white mt-1">
             {report.meanLeadTimeMin !== null ? `${report.meanLeadTimeMin}m` : 'N/A'}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Before PSI &ge; 7.0 crossing (median {report.medianLeadTimeMin ?? 0}m)
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Sensitivity (Recall)</div>
-          <div className="text-3xl font-mono tabular-nums font-bold text-emerald-700 mt-1">
+        <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
+          <div className="text-xs text-slate-400">Sensitivity (Recall)</div>
+          <div className="text-3xl font-mono tabular-nums font-bold text-emerald-400 mt-1">
             {report.sensitivityPct}%
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             {report.detectedEventsCount}/{report.trueEventsCount} crossings detected
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">False-Alarm Rate</div>
-          <div className="text-3xl font-mono tabular-nums font-bold text-amber-700 mt-1">
+        <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
+          <div className="text-xs text-slate-400">False-Alarm Rate</div>
+          <div className="text-3xl font-mono tabular-nums font-bold text-amber-400 mt-1">
             {report.falseAlarmRatePct}%
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Specificity {report.specificityPct}%
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Precision</div>
-          <div className="text-3xl font-mono tabular-nums font-bold text-slate-900 mt-1">
+        <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
+          <div className="text-xs text-slate-400">Precision</div>
+          <div className="text-3xl font-mono tabular-nums font-bold text-white mt-1">
             {report.precisionPct}%
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">Positive predictive value</div>
+          <div className="text-[11px] text-slate-400 mt-1">Positive predictive value</div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">F1 Score</div>
-          <div className="text-3xl font-mono tabular-nums font-bold text-slate-900 mt-1">
+        <div className="bg-[#141821] border border-white/10 rounded-xl p-5">
+          <div className="text-xs text-slate-400">F1 Score</div>
+          <div className="text-3xl font-mono tabular-nums font-bold text-white mt-1">
             {report.f1Score}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">Computed from replay</div>
+          <div className="text-[11px] text-slate-400 mt-1">Computed from replay</div>
         </div>
       </section>
 
       {/* Methodology & Limitations */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-slate-900">Methodology &amp; Data Provenance</h2>
-          <p className="text-sm text-slate-600 leading-relaxed mt-2">{report.methodologyNote}</p>
-          <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-600 space-y-1">
+        <div className="lg:col-span-6 bg-[#141821] border border-white/10 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-white">Methodology &amp; Data Provenance</h2>
+          <p className="text-sm text-slate-400 leading-relaxed mt-2">{report.methodologyNote}</p>
+          <div className="mt-4 pt-4 border-t border-white/5 text-xs text-slate-400 space-y-1">
             <div>
-              <strong className="text-slate-900">Real Data:</strong> {report.weatherDataset}
+              <strong className="text-white">Real Data:</strong> {report.weatherDataset}
             </div>
             <div>
-              <strong className="text-slate-900">Synthetic Data:</strong>{' '}
+              <strong className="text-white">Synthetic Data:</strong>{' '}
               {cohortMetadata.source} ({cohortMetadata.count} worker-days, 08:00–12:00 GST)
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-slate-900">Known Limitations</h2>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600 list-disc pl-5">
+        <div className="lg:col-span-6 bg-[#141821] border border-white/10 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-white">Known Limitations</h2>
+          <ul className="mt-3 space-y-2 text-sm text-slate-400 list-disc pl-5">
             {report.limitations.map((lim, idx) => (
               <li key={idx} className="leading-relaxed">
                 {lim}
@@ -174,14 +174,14 @@ export function ValidationPage() {
       </section>
 
       {/* Trajectory-by-Trajectory Replay Table */}
-      <section className="bg-white border border-slate-200 rounded-xl p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">
+      <section className="bg-[#141821] border border-white/10 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-white mb-4">
           Worker-Day Replay Outcomes ({report.trajectories.length} Trajectories)
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
+              <tr className="border-b border-white/10 text-slate-400">
                 <th className="py-2.5 pr-4 font-medium">Trajectory ID</th>
                 <th className="py-2.5 pr-4 font-medium">Role &amp; PPE</th>
                 <th className="py-2.5 pr-4 font-medium text-right">Acclim.</th>
@@ -191,32 +191,32 @@ export function ValidationPage() {
                 <th className="py-2.5 font-medium text-right">Outcome</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-white/5">
               {report.trajectories.map((t) => (
-                <tr key={t.trajectoryId} className="hover:bg-slate-50/70">
-                  <td className="py-2.5 pr-4 font-mono font-semibold text-slate-900">
+                <tr key={t.trajectoryId} className="hover:bg-white/5">
+                  <td className="py-2.5 pr-4 font-mono font-semibold text-white">
                     {t.trajectoryId}
                   </td>
-                  <td className="py-2.5 pr-4 text-slate-700">
+                  <td className="py-2.5 pr-4 text-slate-300">
                     {t.roleLabel} · {t.ppeLevel}
                   </td>
-                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-600">
+                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-400">
                     {t.acclimatizationDays}d
                   </td>
-                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-700">
+                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-300">
                     {t.firstAlertMin !== null ? `T+${t.firstAlertMin}m` : '—'}
                   </td>
-                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-700">
+                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right text-slate-300">
                     {t.firstCrossingMin !== null ? `T+${t.firstCrossingMin}m` : 'None'}
                   </td>
-                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right font-semibold text-slate-900">
+                  <td className="py-2.5 pr-4 font-mono tabular-nums text-right font-semibold text-white">
                     {t.leadTimeMin !== null ? `${t.leadTimeMin} min` : '—'}
                   </td>
                   <td
                     className={`py-2.5 text-right font-semibold ${
                       t.outcome === 'True Positive' || t.outcome === 'True Negative'
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
+                        ? 'text-emerald-400'
+                        : 'text-rose-400'
                     }`}
                   >
                     {t.outcome}
