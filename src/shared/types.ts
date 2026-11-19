@@ -1,13 +1,57 @@
 export type RiskTier = 'Green' | 'Amber' | 'Red';
 
-export type SupportedLanguage = 'en' | 'hi' | 'ur' | 'bn' | 'tl';
+export type SupportedLanguage =
+  | 'en'
+  | 'ar'
+  | 'hi'
+  | 'ur'
+  | 'bn'
+  | 'tl'
+  | 'ta'
+  | 'ml'
+  | 'ne';
 
-export const LANGUAGE_LABELS: Record<SupportedLanguage, { name: string; native: string }> = {
+export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
+  'en',
+  'ar',
+  'hi',
+  'ur',
+  'bn',
+  'tl',
+  'ta',
+  'ml',
+  'ne',
+];
+
+export const LANGUAGE_LABELS: Record<
+  SupportedLanguage,
+  { name: string; native: string; rtl?: boolean }
+> = {
   en: { name: 'English', native: 'English' },
+  ar: { name: 'Arabic', native: 'العربية', rtl: true },
   hi: { name: 'Hindi', native: 'हिन्दी' },
-  ur: { name: 'Urdu', native: 'اردو' },
+  ur: { name: 'Urdu', native: 'اردو', rtl: true },
   bn: { name: 'Bengali', native: 'বাংলা' },
   tl: { name: 'Tagalog', native: 'Tagalog' },
+  ta: { name: 'Tamil', native: 'தமிழ்' },
+  ml: { name: 'Malayalam', native: 'മലയാളം' },
+  ne: { name: 'Nepali', native: 'नेपाली' },
+};
+
+export function isRtlLanguage(lang: SupportedLanguage): boolean {
+  return lang === 'ar' || lang === 'ur';
+}
+
+export const TTS_LOCALE_BY_LANGUAGE: Record<SupportedLanguage, string> = {
+  en: 'en-US',
+  ar: 'ar-AE',
+  hi: 'hi-IN',
+  ur: 'ur-PK',
+  bn: 'bn-BD',
+  tl: 'fil-PH',
+  ta: 'ta-IN',
+  ml: 'ml-IN',
+  ne: 'ne-NP',
 };
 
 export type PPELevel = 'Standard Coverall' | 'FR / Arc-Flash' | 'Chemical / Tyvek';
@@ -16,6 +60,26 @@ export type EnvironmentFeedStatus =
   | 'live_abu_dhabi_feed'
   | 'gemma4_edge_offline_mode'
   | 'historical_calibration';
+
+export type UaeSiteHubId =
+  | 'abu_dhabi_mussafah'
+  | 'dubai_marina'
+  | 'dubai_jebel_ali'
+  | 'dubai_expo_city';
+
+export interface UaeSiteHubSpec {
+  id: UaeSiteHubId;
+  emirate: 'Abu Dhabi' | 'Dubai';
+  name: string;
+  shortLabel: string;
+  station: string;
+  lat: number;
+  lon: number;
+  airDeltaC: number;
+  humidityDeltaPct: number;
+  solarMultiplier: number;
+  microclimateNote: string;
+}
 
 export interface EnvironmentalObservation {
   timestampIso: string;
@@ -34,6 +98,8 @@ export interface EnvironmentalObservation {
   mode: 'historical_heatwave' | 'live_abu_dhabi';
   sourceLabel: string;
   inUaeMiddayBreakWindow: boolean;
+  hubId?: UaeSiteHubId;
+  emirate?: 'Abu Dhabi' | 'Dubai';
   feedStatus?: EnvironmentFeedStatus;
   provider?: 'OpenWeatherMap' | 'Open-Meteo' | 'Gemma 4 Edge Local Inference' | 'Historical UAE CSV';
   edgeOfflineActive?: boolean;
@@ -194,6 +260,8 @@ export interface WorkerStatusPublic {
   supervisorDirective: string | null;
   breaksTakenTodayMin: number;
   hydrationCount: number;
+  deviceBatteryPct?: number;
+  simulatedClockMin?: number;
   lastUpdated: string;
 }
 
@@ -344,3 +412,56 @@ export interface ForecastValidationReport {
   methodologyNote: string;
   generatedAt: string;
 }
+
+export interface SupervisorAiBriefing {
+  language: SupportedLanguage;
+  executiveSummary: string;
+  priorityActions: string[];
+  zoneFocus: string;
+  heatWindowAdvice: string;
+  source: 'gemini' | 'template_fallback';
+  generatedAt: string;
+}
+
+export interface ComplianceNarrativeRecord {
+  narrative: string;
+  language?: 'en' | 'ar';
+  remediationActions?: string[];
+  auditReadinessStatus?: 'Audit Ready' | 'Remediation Needed';
+  source: 'gemini' | 'template_fallback';
+  updatedAt: string;
+}
+
+export interface ValidationAiInsights {
+  kind: 'backtest' | 'forecast';
+  headline: string;
+  summary: string;
+  keyFindings: string[];
+  engineeringRecommendations: string[];
+  source: 'gemini' | 'template_fallback';
+  generatedAt: string;
+}
+
+export type VoiceCommandIntent =
+  | 'order_break'
+  | 'escalate'
+  | 'apply_rotation'
+  | 'switch_hub'
+  | 'simulate_midday'
+  | 'generate_briefing'
+  | 'navigate'
+  | 'read_summary'
+  | 'status_query';
+
+export interface VoiceCommandResponse {
+  intent: VoiceCommandIntent;
+  executed: boolean;
+  workerId?: string;
+  hubId?: UaeSiteHubId;
+  navigateTo?: '/worker' | '/supervisor' | '/compliance' | '/validation' | '/forecast-validation';
+  language: SupportedLanguage;
+  spokenReply: string;
+  actionSummary: string;
+  source: 'gemini' | 'deterministic_router';
+}
+

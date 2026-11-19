@@ -12,13 +12,17 @@ import type {
   FaultFlags,
   SupportedLanguage,
   SyntheticWorkerDay,
+  UaeSiteHubId,
   VoiceIncidentSeverity,
 } from './src/shared/types.ts';
 import { HISTORICAL_UAE_HEATWAVE_CURVE } from './src/shared/uaeWeatherData.ts';
 import {
   generateComplianceNarrative,
+  generateSupervisorShiftBriefing,
   generateSyntheticCohortViaGemini,
+  generateValidationAiInsights,
   getLastGeminiDiagnostic,
+  parseVoiceCopilotCommand,
   transcribeWorkerVoiceIncident,
 } from './src/server/geminiService.ts';
 import { siteGuardStore } from './src/server/store.ts';
@@ -64,6 +68,27 @@ async function startServer() {
           ? await siteGuardStore.fetchLiveAbuDhabiWeather({ simulateOffline })
           : siteGuardStore.setHistoricalHour(typeof hourGst === 'number' ? hourGst : 11);
       res.json({ current: env, heatwaveCurve: HISTORICAL_UAE_HEATWAVE_CURVE });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/environment/hub', async (req, res) => {
+    try {
+      const { hubId, hourGst, mode } = (req.body ?? {}) as {
+        hubId?: UaeSiteHubId;
+        hourGst?: number;
+        mode?: 'historical_heatwave' | 'live_abu_dhabi';
+      };
+      const env = await siteGuardStore.setActiveHub(hubId ?? 'abu_dhabi_mussafah', {
+        hourGst,
+        mode,
+      });
+      res.json({
+        current: env,
+        hubId: siteGuardStore.getSelectedHubId(),
+        heatwaveCurve: HISTORICAL_UAE_HEATWAVE_CURVE,
+      });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
@@ -231,6 +256,76 @@ async function startServer() {
     }
   });
 
+  app.post('/api/supervisor/ai-briefing', async (req, res) => {
+    try {
+      const { language } = (req.body ?? {}) as { language?: SupportedLanguage };
+      const snapshot = siteGuardStore.getSupervisorSnapshot();
+      const briefing = await generateSupervisorShiftBriefing({
+        crew: snapshot.crew,
+        alerts: snapshot.alerts,
+        env: snapshot.env,
+        language: language ?? 'en',
+      });
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json(briefing);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/voice/command', async (req, res) => {
+    try {
+      const { commandText, language, currentRoute } = (req.body ?? {}) as {
+        commandText?: string;
+        language?: SupportedLanguage;
+        currentRoute?: string;
+      };
+      if (!commandText || !commandText.trim()) {
+        res.status(400).json({ error: 'commandText is required' });
+        return;
+      }
+
+      const initialSnapshot = siteGuardStore.getSupervisorSnapshot();
+      const plan = await parseVoiceCopilotCommand({
+        commandText: commandText.trim(),
+        crew: initialSnapshot.crew,
+        env: initialSnapshot.env,
+        language: language ?? 'en',
+        currentRoute,
+      });
+
+      let executed = false;
+      if (
+        (plan.intent === 'order_break' || plan.intent === 'escalate' || plan.intent === 'apply_rotation') &&
+        plan.workerId
+      ) {
+        siteGuardStore.performSupervisorAction(plan.workerId, plan.intent);
+        executed = true;
+      } else if (plan.intent === 'switch_hub' && plan.hubId) {
+        await siteGuardStore.setActiveHub(plan.hubId, { hourGst: 13, mode: 'historical_heatwave' });
+        executed = true;
+      } else if (plan.intent === 'simulate_midday') {
+        siteGuardStore.setHistoricalHour(13);
+        executed = true;
+      } else if (plan.intent === 'navigate' || plan.intent === 'read_summary' || plan.intent === 'status_query') {
+        executed = true;
+      }
+
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json({
+        result: {
+          ...plan,
+          executed,
+        },
+        snapshot: siteGuardStore.getSupervisorSnapshot(),
+        env: siteGuardStore.getEnvironment(),
+        compliance: siteGuardStore.getComplianceReport(),
+      });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   // ── UAE Midday Break Compliance Endpoints ────────────────────────────────────
   app.get('/api/compliance/report', (_req, res) => {
     res.json(siteGuardStore.getComplianceReport());
@@ -238,7 +333,10 @@ async function startServer() {
 
   app.post('/api/compliance/narrative', async (req, res) => {
     try {
-      const { insurerRef } = (req.body ?? {}) as { insurerRef?: string };
+      const { insurerRef, language } = (req.body ?? {}) as {
+        insurerRef?: string;
+        language?: 'en' | 'ar';
+      };
       const report = siteGuardStore.getComplianceReport();
       const result = await generateComplianceNarrative({
         siteName: report.siteName,
@@ -246,8 +344,13 @@ async function startServer() {
         breaks: report.breaks,
         incidents: report.incidents,
         insurerRef: insurerRef ?? 'MOHRE-AUH-2026-07',
+        language: language === 'ar' ? 'ar' : 'en',
       });
-      const saved = siteGuardStore.setComplianceNarrative(result.narrative, result.source);
+      const saved = siteGuardStore.setComplianceNarrative(result.narrative, result.source, {
+        language: result.language,
+        remediationActions: result.remediationActions,
+        auditReadinessStatus: result.auditReadinessStatus,
+      });
       res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
       res.json(saved);
     } catch (err) {
@@ -318,6 +421,26 @@ async function startServer() {
         count: activeValidationCohort.length,
       },
     });
+  });
+
+  app.post('/api/validation/ai-insights', async (req, res) => {
+    try {
+      const { kind } = (req.body ?? {}) as { kind?: 'backtest' | 'forecast' };
+      const analysis =
+        kind === 'forecast'
+          ? await generateValidationAiInsights({
+              kind: 'forecast',
+              report: runProspectiveForecastValidation(activeValidationCohort),
+            })
+          : await generateValidationAiInsights({
+              kind: 'backtest',
+              report: runBacktest(activeValidationCohort),
+            });
+      res.setHeader('X-SiteGuard-Gemini-Status', getLastGeminiDiagnostic());
+      res.json(analysis);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
   });
 
   // ── Vite Middleware (Dev) or Static Assets + SPA Fallback (Prod) ─────────────

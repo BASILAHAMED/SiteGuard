@@ -381,5 +381,212 @@ describe('Predictive Forecast Engine & LLM Safety Boundary', () => {
       expect(sanitized[lang].explanation).not.toContain('36 minutes');
     }
     expect(sanitized.en.proactiveForecastNote).toContain('No Amber or Red threshold crossing');
+    // Missing ar/ta/ml/ne keys in partial LLM JSON fall back safely to deterministic localized templates
+    for (const addedLang of ['ar', 'ta', 'ml', 'ne'] as const) {
+      expect(sanitized[addedLang].headline.length).toBeGreaterThan(2);
+      expect(sanitized[addedLang].proactiveForecastNote?.length ?? 0).toBeGreaterThan(5);
+    }
+  });
+
+  it('supports all 9 Dubai/UAE languages in deterministic fallback and blocks Tamil/Arabic/Malayalam/Nepali ETA hallucinations', async () => {
+    const {
+      clearAlertTranslationCache,
+      getMultilingualWorkerAlert,
+    } = await import('../../src/server/geminiService.ts');
+    const { SUPPORTED_LANGUAGES } = await import('../../src/shared/types.ts');
+    clearAlertTranslationCache();
+
+    const fallingHistory: TelemetryHistoryPoint[] = [
+      { minuteOffset: 0, timestamp: 't0', psi: 5.5, compositeScore: 5.8, wbgtC: 34, degraded: false },
+      { minuteOffset: 3, timestamp: 't1', psi: 5.2, compositeScore: 5.5, wbgtC: 34, degraded: false },
+      { minuteOffset: 6, timestamp: 't2', psi: 4.9, compositeScore: 5.1, wbgtC: 34, degraded: false },
+      { minuteOffset: 9, timestamp: 't3', psi: 4.5, compositeScore: 4.7, wbgtC: 34, degraded: false },
+    ];
+    const coolingForecast: ForecastOutput = {
+      ...predictCompositeTrajectory(fallingHistory, 0.0),
+      projectedAmberCrossingMin: null,
+      projectedRedCrossingMin: null,
+    };
+
+    const ctx: WorkerContext = {
+      workerId: 'W-9LANG-1',
+      deviceId: 'BLE-9L',
+      roleLabel: 'Crane Signalman',
+      zone: 'Zone C · Dubai Marina',
+      ppeLevel: 'Standard Coverall',
+      acclimatizationDays: 9,
+      ageYears: 31,
+      hr0: 69,
+      tc0: 36.7,
+      preferredLanguage: 'ta',
+      plannedBreakTime: '12:30',
+      hydrationCount: 2,
+      breaksTakenTodayMin: 15,
+    };
+
+    const assessment: RiskAssessment = {
+      workerId: ctx.workerId,
+      timestamp: '2025-08-14T11:20:00+04:00',
+      psi: 3.3,
+      tcProxyC: 37.1,
+      hrMaxEstimated: 186,
+      effectiveWbgtC: 34.2,
+      acgihActionLimitC: 25.5,
+      acgihTlvLimitC: 28.5,
+      envRiskScore: 5.1,
+      compositeScore: 3.7,
+      tier: 'Green',
+      scoringMode: 'physiological_plus_env',
+      degradedReason: null,
+      gpsDegraded: false,
+      contributingFactors: ['Cooling trend'],
+      recommendedAction: 'Hydrate every 20 minutes.',
+    };
+
+    generateContentMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        ar: {
+          headline: 'حالة مستقرة',
+          explanation: 'تنخفض درجة الحرارة.',
+          action: 'اشرب الماء.',
+          proactiveForecastNote: 'سيصل إلى مستوى التحذير خلال 2 دقيقة.',
+        },
+        ta: {
+          headline: 'பாதுகாப்பான நிலை',
+          explanation: 'வெப்பம் குறைகிறது.',
+          action: 'தண்ணீர் குடிக்கவும்.',
+          proactiveForecastNote: '2 நிமிடங்களில் மஞ்சள் எச்சரிக்கை வரும்.',
+        },
+        ml: {
+          headline: 'സുരക്ഷിതമാണ്',
+          explanation: 'താപം കുറയുന്നു.',
+          action: 'വെള്ളം കുടിക്കുക.',
+          proactiveForecastNote: '2 മിനിറ്റിൽ മുന്നറിയിപ്പ് എത്തും.',
+        },
+        ne: {
+          headline: 'सुरक्षित अवस्था',
+          explanation: 'तापक्रम घट्दैछ।',
+          action: 'पानी पिउनुहोस्।',
+          proactiveForecastNote: '२ मिनेटमा चेतावनी पुग्नेछ।',
+        },
+      }),
+    });
+
+    const out = await getMultilingualWorkerAlert(ctx, assessment, coolingForecast, ENV_SAMPLE);
+    expect(Object.keys(out).sort()).toEqual([...SUPPORTED_LANGUAGES].sort());
+    for (const lang of ['ar', 'ta', 'ml', 'ne'] as const) {
+      expect(out[lang].proactiveForecastNote).not.toMatch(/\b2\b|२/);
+    }
+  });
+
+  it('strips any accidental raw physiological vitals from Supervisor AI shift briefings', async () => {
+    const { generateSupervisorShiftBriefing } = await import('../../src/server/geminiService.ts');
+    generateContentMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        executiveSummary: 'W-104 reached 142 bpm and PSI 7.4 with Tc proxy 38.6 and needs shade.',
+        priorityActions: ['Rotate W-104 (HR0 72, HRmax 188, Borg 15) into cool recovery.'],
+        zoneFocus: 'Zone A Steel Deck',
+        heatWindowAdvice: 'Enforce 12:30–15:00 GST UAE midday break.',
+      }),
+    });
+
+    const briefing = await generateSupervisorShiftBriefing({
+      crew: [
+        {
+          workerId: 'W-104',
+          roleLabel: 'Steel Fixer',
+          zone: 'Zone A',
+          ppeLevel: 'FR / Arc-Flash',
+          acclimatizationDays: 3,
+          breaksTakenTodayMin: 10,
+          tier: 'Red',
+          riskBandLabel: 'High Strain Band',
+          scoringMode: 'physiological_plus_env',
+          degradedReason: null,
+          faultSummary: [],
+          gpsDegraded: false,
+          recommendedAction: 'Stop work and move to AC shade immediately.',
+          acknowledged: false,
+          lastCheckIn: null,
+          predictedTier15: 'Red',
+          predictedTier30: 'Red',
+          projectedAmberCrossingMin: 0,
+          projectedRedCrossingMin: 0,
+          forecastStatus: 'ready',
+          sparklineComposite: [5.5, 6.2, 6.9, 7.2],
+          sparklineProjected: [7.2, 7.5, 7.6],
+          supervisorDirective: null,
+          hydrationCount: 2,
+          lastUpdated: '2025-08-14T11:20:00+04:00',
+        },
+      ],
+      alerts: [],
+      env: ENV_SAMPLE,
+      language: 'en',
+    });
+
+    const combined = `${briefing.executiveSummary} ${briefing.priorityActions.join(' ')}`;
+    expect(combined).not.toMatch(/\b\d+\s*bpm\b/i);
+    expect(combined).not.toMatch(/\bPSI\s*\d/i);
+    expect(combined).not.toMatch(/\bHR0\b|\bHRmax\b|\bTc proxy\b|\bBorg\b/i);
+  });
+
+  it('routes Dubai Marina & dispatch commands via Voice AI Co-Pilot while sanitizing raw physiological vitals', async () => {
+    const { parseVoiceCopilotCommand } = await import('../../src/server/geminiService.ts');
+
+    const crewFixture = [
+      {
+        workerId: 'W-104',
+        roleLabel: 'Tank Coating Tech',
+        zone: 'Zone C · Enclosed Bay',
+        ppeLevel: 'Chemical / Tyvek' as const,
+        acclimatizationDays: 3,
+        breaksTakenTodayMin: 10,
+        tier: 'Red' as const,
+        riskBandLabel: 'Critical Heat Strain',
+        scoringMode: 'physiological_plus_env' as const,
+        degradedReason: null,
+        faultSummary: [],
+        gpsDegraded: false,
+        recommendedAction: 'Stop outdoor work immediately.',
+        acknowledged: false,
+        lastCheckIn: null,
+        predictedTier15: 'Red' as const,
+        predictedTier30: 'Red' as const,
+        projectedAmberCrossingMin: 0,
+        projectedRedCrossingMin: 0,
+        forecastStatus: 'ready' as const,
+        sparklineComposite: [6.4, 6.8, 7.1, 7.3],
+        sparklineProjected: [7.3, 7.5, 7.6],
+        supervisorDirective: null,
+        hydrationCount: 2,
+        lastUpdated: '2025-08-14T11:20:00+04:00',
+      },
+    ];
+
+    // Mock Gemini emitting an accidental vital leak inside spokenReply
+    generateContentMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        intent: 'switch_hub',
+        hubId: 'dubai_marina',
+        spokenReply: 'Switching to Dubai Marina Tower Deck. W-104 was 148 bpm and PSI 7.5.',
+        actionSummary: 'Switched to Dubai Marina',
+      }),
+    });
+
+    const dubaiPlan = await parseVoiceCopilotCommand({
+      commandText: 'Simulate Dubai Marina',
+      crew: crewFixture,
+      env: ENV_SAMPLE,
+      language: 'en',
+      currentRoute: '/supervisor',
+    });
+
+    expect(dubaiPlan.intent).toBe('switch_hub');
+    expect(dubaiPlan.hubId).toBe('dubai_marina');
+    expect(dubaiPlan.spokenReply).not.toMatch(/\b\d+\s*bpm\b/i);
+    expect(dubaiPlan.spokenReply).not.toMatch(/\bPSI\s*\d/i);
   });
 });
+
+

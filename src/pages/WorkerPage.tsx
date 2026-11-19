@@ -9,6 +9,7 @@ import {
   Clock,
   Code2,
   MapPinOff,
+  Mic,
   OctagonAlert,
   Play,
   Radio,
@@ -16,21 +17,35 @@ import {
   Thermometer,
   Wrench,
 } from 'lucide-react';
+import { AnimatedMetric } from '../components/PageTransition';
 import { SparklineChart } from '../components/SparklineChart';
 import { VoiceIncidentRecorder } from '../components/VoiceIncidentRecorder';
-import { WatchFaceGauge } from '../components/WatchFaceGauge';
+import { WatchShell } from '../components/WatchShell';
+import {
+  AlertStateSwitcher,
+  WearableAlertSpecColumn,
+} from '../components/WearableAlertTelemetryPanels';
+import { WorkerVoiceAlertBar } from '../components/WorkerVoiceAlertBar';
+import { useWorkerVoiceAlerts } from '../hooks/useWorkerVoiceAlerts';
+import { getTierTokens, SG_SURFACES } from '../shared/designTokens';
 import { synthesizeGemma4EdgeObservation } from '../shared/edgeWeatherFallback';
 import { predictCompositeTrajectory } from '../shared/forecastEngine';
 import { assessWorkerHeatRisk } from '../shared/riskEngine';
 import { formatTemperature, type TemperatureUnit } from '../shared/temperature';
 import {
+  isRtlLanguage,
   LANGUAGE_LABELS,
+  SUPPORTED_LANGUAGES,
   type BLETelemetryFrame,
   type EnvironmentalObservation,
   type FaultFlags,
   type SupportedLanguage,
   type WorkerStateSelf,
 } from '../shared/types';
+import {
+  WEARABLE_SPEC_TELEMETRY,
+  type WearableAlertStateId,
+} from '../shared/wearableAlertSpecs';
 
 function readCachedWorkerState(workerId: string): WorkerStateSelf | null {
   try {
@@ -117,6 +132,10 @@ function buildColdOfflineWorkerState(
     source: 'template_fallback' as const,
     cached: true,
   };
+  const alertTranslations = {} as WorkerStateSelf['alertTranslations'];
+  for (const code of SUPPORTED_LANGUAGES) {
+    alertTranslations[code] = copy;
+  }
   return {
     context,
     latestFrame: frame,
@@ -124,13 +143,7 @@ function buildColdOfflineWorkerState(
     assessment,
     forecast,
     history,
-    alertTranslations: {
-      en: copy,
-      hi: copy,
-      ur: copy,
-      bn: copy,
-      tl: copy,
-    },
+    alertTranslations,
     lastCheckIn: null,
     supervisorDirective: null,
     simulatedClockMin: 12,
@@ -196,14 +209,23 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aodMode, setAodMode] = useState(false);
+  const [voiceSheetOpen, setVoiceSheetOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [showBleJson, setShowBleJson] = useState(false);
+  const [alertPreviewState, setAlertPreviewState] = useState<WearableAlertStateId>('live');
+  const forecastSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Local slider mirrors inside collapsed Developer / BLE Simulator drawer
   const [hrSlider, setHrSlider] = useState(120);
   const [skinSlider, setSkinSlider] = useState(35.0);
   const [exertionSlider, setExertionSlider] = useState(6.0);
   const debounceRef = useRef<number | null>(null);
+
+  const voiceAlerts = useWorkerVoiceAlerts({
+    workerState,
+    alertPreviewState,
+    tempUnit,
+  });
 
   const getActiveOfflineEnv = useCallback(
     () => env ?? synthesizeGemma4EdgeObservation(null, 'Gemma 4 Edge local inference active'),
@@ -474,8 +496,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 h-[560px] bg-slate-200/70 rounded-2xl animate-pulse" />
-          <div className="lg:col-span-7 h-[560px] bg-slate-200/70 rounded-xl animate-pulse" />
+          <div className="lg:col-span-5 h-[560px] bg-[#141821] border border-white/10 rounded-[24px] animate-pulse" />
+          <div className="lg:col-span-7 h-[560px] bg-[#141821] border border-white/10 rounded-[24px] animate-pulse" />
         </div>
       </main>
     );
@@ -484,7 +506,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   if (error || !workerState) {
     return (
       <main className="max-w-[1280px] mx-auto px-6 py-8">
-        <div className="bg-white border border-rose-200 rounded-xl p-6 text-sm text-rose-700">
+        <div className="bg-[#fa114f]/15 border border-[#fa114f]/40 rounded-[22px] p-6 text-sm text-rose-200">
           {error ?? 'Unable to load worker view.'}
         </div>
       </main>
@@ -494,31 +516,33 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
   const { context, assessment, forecast, faults, latestFrame, alertTranslations } = workerState;
   const lang = context.preferredLanguage;
   const copy = alertTranslations[lang] ?? alertTranslations.en;
-  const isRtl = lang === 'ur';
+  const isRtl = isRtlLanguage(lang);
+  const tierTokens = getTierTokens(assessment.tier);
 
   return (
     <main className="max-w-[1280px] mx-auto px-6 py-8 space-y-8">
       {/* Page Title & Active Unit Selector */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
             Worker Wearable Safety Display
           </h1>
-          <p className="text-sm text-slate-600 mt-1">
-            {context.workerId} · {context.roleLabel} · {context.zone} · {context.ppeLevel} ·{' '}
-            {context.acclimatizationDays}d acclimatized
+          <p className="text-sm text-slate-400 mt-1">
+            <span className="font-mono text-[#787aff] font-semibold">{context.workerId}</span> ·{' '}
+            {context.roleLabel} · {context.zone} · {context.ppeLevel} ·{' '}
+            <span className="font-mono tabular-nums">{context.acclimatizationDays}d</span> acclimatized
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <label htmlFor="worker-select" className="text-xs font-medium text-slate-600">
+          <label htmlFor="worker-select" className="text-xs font-medium text-slate-400">
             Active Unit
           </label>
           <select
             id="worker-select"
             value={selectedWorkerId}
             onChange={(e) => setSelectedWorkerId(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-900 cursor-pointer"
+            className="bg-[#141821] border border-white/15 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-100 focus:outline-none focus:border-[#787aff] cursor-pointer"
           >
             {(workers.length > 0
               ? workers
@@ -532,24 +556,112 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
         </div>
       </div>
 
+      {/* Alert State Switcher (Live Telemetry + 4 Wearable Safety Alert Specs) */}
+      <AlertStateSwitcher
+        activeState={alertPreviewState}
+        onChangeState={(next) => {
+          setAlertPreviewState(next);
+          if (next !== 'live') {
+            setAodMode(false);
+          }
+        }}
+      />
+
       {/* PRIMARY STAGE: WATCH FACE DIAL + WORKER SAFETY GUIDANCE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN: PRIMARY CIRCULAR WATCH FACE + CHECK-IN + VOICE INCIDENT */}
+        {/* LEFT COLUMN: APPLE WATCH SHELL (WATCH FACE + CAROUSEL + CROWN GRID + SOS + VOICE SHEET) */}
         <section className="lg:col-span-5 space-y-4">
-          <WatchFaceGauge
+          <WatchShell
             workerState={workerState}
             aodMode={aodMode}
             onToggleAod={() => setAodMode((v) => !v)}
+            onCheckIn={handleCheckIn}
+            onToggleFault={handleFaultToggle}
+            onNavigateForecast={() =>
+              forecastSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+            voiceSheetOpen={voiceSheetOpen}
+            onOpenVoiceSheet={() => setVoiceSheetOpen(true)}
+            onCloseVoiceSheet={() => setVoiceSheetOpen(false)}
+            updating={updating}
+            alertPreviewState={alertPreviewState}
+            tempUnit={tempUnit}
+            edgeOfflineActive={Boolean(env?.edgeOfflineActive)}
+            voiceRecorderSlot={
+              <VoiceIncidentRecorder
+                workerId={context.workerId}
+                language={lang}
+                onReportLogged={(updatedState) => setWorkerState(updatedState)}
+              />
+            }
           />
 
-          {/* Worker Actions & Voice Safety Reporting Shell */}
-          <div className="bg-[#0B1120] text-slate-100 rounded-2xl border border-slate-800 p-5 shadow-sm">
+          {/* Worker Actions & Voice Sheet Launcher Shell */}
+          <div className={`${SG_SURFACES.panel} text-slate-100 p-5`}>
             {/* Compact Wearable Biometric Strip */}
-            <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-400 pb-3 border-b border-slate-800">
-              <span>HR {latestFrame.hrBpm} bpm</span>
-              <span>Skin {formatTemperature(latestFrame.skinTempC, tempUnit, 1)}</span>
-              <span>{faults.bleDisconnected ? 'BLE OFF' : `${latestFrame.rssiDbm} dBm`}</span>
-            </div>
+            {alertPreviewState === 'sos_active' ? (
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums text-rose-200 pb-3 border-b border-white/10">
+                <span>
+                  HR <strong className="text-white">{WEARABLE_SPEC_TELEMETRY.sosActive.hrBpm} bpm</strong>
+                </span>
+                <span>
+                  Skin{' '}
+                  <strong className="text-white">
+                    {formatTemperature(WEARABLE_SPEC_TELEMETRY.sosActive.skinTempC, tempUnit, 1)}
+                  </strong>
+                </span>
+                <span className="text-[#ff6b93] font-semibold">DISTRESS ACTIVE</span>
+              </div>
+            ) : alertPreviewState === 'hydration_alert' ? (
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-300 pb-3 border-b border-white/10">
+                <span>
+                  Skin{' '}
+                  <strong className="text-white">
+                    {formatTemperature(WEARABLE_SPEC_TELEMETRY.hydrationAlert.skinTempC, tempUnit, 1)}
+                  </strong>
+                </span>
+                <span>
+                  RH <strong className="text-cyan-300">{WEARABLE_SPEC_TELEMETRY.hydrationAlert.relHumidityPct}%</strong>
+                </span>
+                <span className="text-emerald-300">
+                  {WEARABLE_SPEC_TELEMETRY.hydrationAlert.sweatRateMlHr} ml/hr
+                </span>
+              </div>
+            ) : alertPreviewState === 'high_heat' || alertPreviewState === 'amber_forecast' ? (
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-300 pb-3 border-b border-white/10">
+                <span>
+                  Air <strong className="text-white">{formatTemperature(47.1, tempUnit, 1)}</strong>
+                </span>
+                <span>
+                  RH <strong className="text-cyan-300">29%</strong>
+                </span>
+                <span>
+                  WBGT <strong className="text-amber-300">{formatTemperature(37.2, tempUnit, 1)}</strong>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-400 pb-3 border-b border-white/10">
+                <span>
+                  HR <AnimatedMetric value={latestFrame.hrBpm} className="text-slate-200" /> bpm
+                </span>
+                <span>
+                  Skin{' '}
+                  <AnimatedMetric
+                    value={formatTemperature(latestFrame.skinTempC, tempUnit, 1)}
+                    className="text-slate-200"
+                  />
+                </span>
+                <span>
+                  {faults.bleDisconnected ? (
+                    <span className="text-amber-300">BLE OFF</span>
+                  ) : (
+                    <>
+                      <AnimatedMetric value={latestFrame.rssiDbm} className="text-slate-200" /> dBm
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* Check-In Status Confirmation */}
             {workerState.lastCheckIn && (
@@ -558,8 +670,8 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 aria-live="polite"
                 className={`mt-4 px-3.5 py-2.5 rounded-xl border text-xs ${
                   workerState.lastCheckIn.status === 'help'
-                    ? 'bg-rose-950/90 border-rose-500 text-rose-100'
-                    : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-100'
+                    ? 'bg-[#fa114f]/15 border-[#fa114f]/60 text-rose-100'
+                    : 'bg-[#10b981]/15 border-[#10b981]/50 text-emerald-100'
                 }`}
               >
                 <div className="font-mono font-bold tracking-wide">
@@ -581,7 +693,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 type="button"
                 disabled={checkInSending !== null}
                 onClick={() => handleCheckIn('okay')}
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#10b981] hover:brightness-110 active:scale-[0.99] disabled:opacity-60 text-slate-950 text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{checkInSending === 'okay' ? 'Sending...' : "I'm Okay"}</span>
@@ -590,61 +702,96 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 type="button"
                 disabled={checkInSending !== null}
                 onClick={() => handleCheckIn('help')}
-                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="min-h-[44px] px-4 py-2.5 rounded-xl bg-[#fa114f] hover:brightness-110 active:scale-[0.99] disabled:opacity-60 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <OctagonAlert className="w-4 h-4" />
                 <span>{checkInSending === 'help' ? 'Alerting...' : 'Need Help'}</span>
               </button>
             </div>
 
-            {/* Microphone Voice Incident Report Recorder */}
-            <VoiceIncidentRecorder
-              workerId={context.workerId}
-              language={lang}
-              onReportLogged={(updatedState) => setWorkerState(updatedState)}
-            />
+            {/* Siri-Style Watch Voice Sheet Trigger */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <button
+                type="button"
+                data-testid="open-voice-sheet-btn"
+                onClick={() => setVoiceSheetOpen(true)}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-[#787aff]/50 bg-[#787aff]/15 hover:bg-[#787aff]/25 active:scale-[0.99] text-slate-100 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Mic className="w-4 h-4 text-[#787aff]" />
+                <span>Open Watch Voice Incident Sheet</span>
+              </button>
+            </div>
           </div>
         </section>
 
         {/* RIGHT COLUMN: MULTILINGUAL WORKER GUIDANCE + PREDICTIVE TRAJECTORY + CLOCK/LANGUAGE */}
         <section className="lg:col-span-7 space-y-6">
+          {alertPreviewState !== 'live' ? (
+            <WearableAlertSpecColumn
+              alertState={alertPreviewState}
+              language={lang}
+              onChangeLanguage={handleLanguageChange}
+              tempUnit={tempUnit}
+              updating={updating}
+              onBackToLive={() => setAlertPreviewState('live')}
+              onDispatchRealSos={() => handleCheckIn('help')}
+              hydrationCount={context.hydrationCount}
+              onLogHydrationCheckIn={() => handleCheckIn('okay')}
+            />
+          ) : (
+            <>
           {/* Degraded Mode Notices */}
           {assessment.scoringMode === 'environment_only_degraded' && (
-            <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900">
-              <strong className="font-semibold">DEGRADED · ENVIRONMENT-ONLY MODE:</strong>{' '}
-              {assessment.degradedReason}. Scoring safely via outdoor WBGT ({formatTemperature(assessment.effectiveWbgtC, tempUnit, 1)} eff.).
+            <div className="px-4 py-3 rounded-[22px] bg-[#f59e0b]/10 border border-[#f59e0b]/35 text-xs text-amber-200">
+              <strong className="font-semibold text-amber-100">
+                DEGRADED · ENVIRONMENT-ONLY MODE:
+              </strong>{' '}
+              {assessment.degradedReason}. Scoring safely via outdoor WBGT (
+              <span className="font-mono tabular-nums">
+                {formatTemperature(assessment.effectiveWbgtC, tempUnit, 1)}
+              </span>{' '}
+              eff.).
             </div>
           )}
           {assessment.gpsDegraded && (
-            <div className="px-4 py-3 rounded-xl bg-slate-100 border border-amber-300 text-xs text-slate-900">
-              <strong className="font-semibold">DEGRADED · GPS SIGNAL LOST:</strong>{' '}
+            <div className="px-4 py-3 rounded-[22px] bg-[#141821] border border-[#f59e0b]/35 text-xs text-amber-200">
+              <strong className="font-semibold text-amber-100">DEGRADED · GPS SIGNAL LOST:</strong>{' '}
               Zone pinned to last verified beacon ({context.zone}).
             </div>
           )}
 
           {/* Multilingual Alert Card */}
-          <div className="bg-[#0B1120] text-slate-100 rounded-2xl border border-slate-800 p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
-              <div className="flex flex-wrap items-center gap-2">
+          <div className={`bg-[#141821]/95 text-slate-100 rounded-[24px] border p-6 shadow-[0_12px_40px_rgba(0,0,0,0.38)] transition-colors ${tierTokens.ringClass}`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
                   Wearable Safety Guidance ({LANGUAGE_LABELS[lang].native})
                 </span>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg border text-[11px] font-mono font-semibold ${tierTokens.pillClass}`}
+                >
+                  <span aria-hidden="true" className={`w-2 h-2 rounded-full ${tierTokens.dotClass}`} />
+                  <span>
+                    <AnimatedMetric value={assessment.compositeScore.toFixed(1)} />
+                    /10 · {assessment.tier}
+                  </span>
+                </span>
                 {env?.edgeOfflineActive && (
-                  <span className="px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/15 text-[10px] font-mono text-amber-200">
+                  <span className="px-2 py-0.5 rounded-lg border border-[#f59e0b]/40 bg-[#f59e0b]/15 text-[10px] font-mono text-amber-200">
                     Gemma 4 Edge Local Inference
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-900 rounded-lg border border-slate-800">
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0c111d] rounded-xl border border-white/10">
                 {(Object.keys(LANGUAGE_LABELS) as SupportedLanguage[]).map((code) => (
                   <button
                     key={code}
                     type="button"
                     disabled={updating}
                     onClick={() => handleLanguageChange(code)}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                    className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-all active:scale-[0.99] cursor-pointer whitespace-nowrap ${
                       lang === code
-                        ? 'bg-white text-slate-900 shadow-xs'
+                        ? 'bg-[#787aff] text-white shadow-xs'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
@@ -664,21 +811,27 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
             </div>
 
             {workerState.supervisorDirective && (
-              <div className="mt-4 px-3 py-2.5 rounded-lg bg-sky-500/15 border border-sky-400/40 text-xs text-sky-100">
-                <span className="font-semibold">Supervisor Order:</span> {workerState.supervisorDirective}
+              <div className="mt-4 px-3.5 py-2.5 rounded-xl bg-[#787aff]/15 border border-[#787aff]/40 text-xs text-slate-100">
+                <span className="font-semibold text-[#a5a7ff]">Supervisor Order:</span>{' '}
+                {workerState.supervisorDirective}
               </div>
             )}
 
             {/* Predictive Early-Warning Forecast & Sparkline */}
-            <div className="mt-5 pt-4 border-t border-slate-800">
+            <div id="forecast-section" ref={forecastSectionRef} className="mt-5 pt-4 border-t border-white/10">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-semibold text-slate-300">
+                <span className="text-xs font-semibold text-slate-200">
                   30-Min Strain Trajectory Forecast
                 </span>
                 <span className="text-[11px] font-mono tabular-nums text-slate-400">
-                  {forecast.status === 'ready' && forecast.psi15
-                    ? `t+15m: ${forecast.psi15.point.toFixed(1)} [${forecast.psi15.low.toFixed(1)}–${forecast.psi15.high.toFixed(1)}]`
-                    : 'Insufficient trend data'}
+                  {forecast.status === 'ready' && forecast.psi15 ? (
+                    <>
+                      t+15m: <AnimatedMetric value={forecast.psi15.point.toFixed(1)} className="text-slate-200" /> [
+                      {forecast.psi15.low.toFixed(1)}–{forecast.psi15.high.toFixed(1)}]
+                    </>
+                  ) : (
+                    'Insufficient trend data'
+                  )}
                 </span>
               </div>
 
@@ -689,7 +842,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                     <p
                       dir={isRtl ? 'rtl' : 'ltr'}
                       data-testid="proactive-forecast-note"
-                      className="mt-2.5 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/25 rounded-lg px-3 py-2 leading-relaxed"
+                      className="mt-2.5 text-xs text-amber-200 bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-xl px-3.5 py-2.5 leading-relaxed"
                     >
                       {copy.proactiveForecastNote}
                     </p>
@@ -697,36 +850,60 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   <div className="mt-2.5 flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-400">
                     <span>
                       Amber ETA:{' '}
-                      {forecast.projectedAmberCrossingMin === 0
-                        ? 'Reached'
-                        : forecast.projectedAmberCrossingMin !== null
-                          ? `~${forecast.projectedAmberCrossingMin} min`
-                          : 'Not projected'}
+                      <AnimatedMetric
+                        value={
+                          forecast.projectedAmberCrossingMin === 0
+                            ? 'Reached'
+                            : forecast.projectedAmberCrossingMin !== null
+                              ? `~${forecast.projectedAmberCrossingMin} min`
+                              : 'Not projected'
+                        }
+                        className="text-slate-200"
+                      />
                     </span>
                     <span>
                       Red ETA:{' '}
-                      {forecast.projectedRedCrossingMin === 0
-                        ? 'Reached'
-                        : forecast.projectedRedCrossingMin !== null
-                          ? `~${forecast.projectedRedCrossingMin} min`
-                          : 'Not projected'}
+                      <AnimatedMetric
+                        value={
+                          forecast.projectedRedCrossingMin === 0
+                            ? 'Reached'
+                            : forecast.projectedRedCrossingMin !== null
+                              ? `~${forecast.projectedRedCrossingMin} min`
+                              : 'Not projected'
+                        }
+                        className="text-slate-200"
+                      />
                     </span>
                   </div>
                 </>
               ) : (
-                <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-4 text-xs text-slate-300">
+                <div className="rounded-xl border border-white/10 bg-[#0c111d] px-3.5 py-4 text-xs text-slate-300">
                   <div className="font-semibold text-amber-300">Insufficient Trend Data</div>
                   <p className="mt-1 text-slate-400">{forecast.reason}</p>
                 </div>
               )}
             </div>
           </div>
+            </>
+          )}
+
+          {/* Audible Multilingual Voice-Synthesis Safety Alert Integration */}
+          <WorkerVoiceAlertBar
+            enabled={voiceAlerts.enabled}
+            onToggleEnabled={voiceAlerts.setEnabled}
+            speaking={voiceAlerts.speaking}
+            language={lang}
+            evaluation={voiceAlerts.evaluation}
+            lastSpokenAlert={voiceAlerts.lastSpokenAlert}
+            onSpeakNow={voiceAlerts.speakNow}
+            onStopSpeaking={voiceAlerts.stopSpeaking}
+          />
 
           {/* Simulated Clock Controls */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <div className={`${SG_SURFACES.panel} p-5`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <Clock className="w-4 h-4 text-[#787aff] shrink-0" />
                 <span>
                   Advance simulated shift time to watch the watch face forecast &amp; crossing update live:
                 </span>
@@ -736,7 +913,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('step_3m')}
-                  className="px-3 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  className={`${SG_SURFACES.buttonPrimary} px-3.5 py-2 text-xs flex items-center gap-1.5`}
                 >
                   <Play className="w-3.5 h-3.5" />
                   <span>+3 min Step</span>
@@ -745,7 +922,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('step_6m')}
-                  className="px-3 py-2 text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-200 cursor-pointer whitespace-nowrap"
+                  className={`${SG_SURFACES.buttonSecondary} px-3.5 py-2 text-xs`}
                 >
                   +6 min Step
                 </button>
@@ -753,7 +930,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleSimStep('reset_cool')}
-                  className="px-3 py-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                  className={`${SG_SURFACES.buttonSecondary} px-3.5 py-2 text-xs text-slate-300 flex items-center gap-1`}
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset Cool</span>
@@ -765,29 +942,29 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
       </div>
 
       {/* DEMOTED COLLAPSIBLE DRAWER: DEVELOPER / BLE SIMULATOR (Sliders + Fault Injection) */}
-      <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <section className={`${SG_SURFACES.panel} overflow-hidden`}>
         <button
           type="button"
           aria-expanded={simulatorOpen}
           aria-controls="ble-simulator-drawer"
           onClick={() => setSimulatorOpen((v) => !v)}
-          className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+          className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-white/[0.03] transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <Wrench className="w-4 h-4 text-slate-600 shrink-0" />
+            <Wrench className="w-4 h-4 text-[#787aff] shrink-0" />
             <div>
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-white">
                 Developer / BLE Simulator
               </span>
-              <span className="ml-2 text-xs text-slate-500">
+              <span className="ml-2 text-xs text-slate-400">
                 Physiological telemetry sliders, presets, hardware fault injection &amp; BLE JSON contract
               </span>
             </div>
           </div>
           {simulatorOpen ? (
-            <ChevronDown className="w-4 h-4 text-slate-600 shrink-0" />
+            <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
           )}
         </button>
 
@@ -795,18 +972,18 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
           <div
             id="ble-simulator-drawer"
             data-testid="ble-simulator-drawer"
-            className="p-6 pt-2 border-t border-slate-200 space-y-6"
+            className="p-6 pt-4 border-t border-white/10 space-y-6"
           >
             {/* Physiological Stream Simulator Sliders */}
             <div>
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-white">
                     Wearable Physiological Simulator
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Simulated stream calibrated to ACGIH/NIOSH thresholds · pushed via{' '}
-                    <code className="font-mono text-slate-700">POST /api/ble/telemetry</code>
+                    <code className="font-mono text-[#a5a7ff]">POST /api/ble/telemetry</code>
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -818,7 +995,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(4.0);
                       pushBleFrame(96, 34.1, 4.0);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md hover:bg-emerald-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-[#10b981]/15 text-emerald-300 border border-[#10b981]/40 rounded-lg hover:bg-[#10b981]/25 active:scale-[0.99] transition-all cursor-pointer"
                   >
                     Normal
                   </button>
@@ -830,7 +1007,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(7.2);
                       pushBleFrame(138, 36.0, 7.2);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 rounded-md hover:bg-amber-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-[#f59e0b]/15 text-amber-300 border border-[#f59e0b]/40 rounded-lg hover:bg-[#f59e0b]/25 active:scale-[0.99] transition-all cursor-pointer"
                   >
                     Heat Ramp
                   </button>
@@ -842,7 +1019,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                       setExertionSlider(8.8);
                       pushBleFrame(164, 37.2, 8.8);
                     }}
-                    className="px-2.5 py-1 text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 rounded-md hover:bg-rose-100 cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-medium bg-[#fa114f]/15 text-rose-300 border border-[#fa114f]/50 rounded-lg hover:bg-[#fa114f]/25 active:scale-[0.99] transition-all cursor-pointer"
                   >
                     Critical
                   </button>
@@ -853,11 +1030,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Heart Rate Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="hr-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Activity className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="hr-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-[#787aff]" />
                       <span>Heart Rate</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {hrSlider} bpm
                     </span>
                   </div>
@@ -876,11 +1053,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Skin Temp Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="skin-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Thermometer className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="skin-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Thermometer className="w-4 h-4 text-[#787aff]" />
                       <span>Skin Temp</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {formatTemperature(skinSlider, tempUnit, 1)}
                     </span>
                   </div>
@@ -899,11 +1076,11 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                 {/* Exertion Slider */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1.5">
-                    <label htmlFor="exertion-slider" className="font-medium text-slate-800 flex items-center gap-1.5">
-                      <Radio className="w-4 h-4 text-slate-500" />
+                    <label htmlFor="exertion-slider" className="font-medium text-slate-200 flex items-center gap-1.5">
+                      <Radio className="w-4 h-4 text-[#787aff]" />
                       <span>Exertion (0–10)</span>
                     </label>
-                    <span className="font-mono tabular-nums font-semibold text-slate-900">
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {exertionSlider.toFixed(1)}
                     </span>
                   </div>
@@ -922,13 +1099,13 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
             </div>
 
             {/* Fault Injection & Graceful Degradation */}
-            <div className="pt-5 border-t border-slate-100">
+            <div className="pt-5 border-t border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-white">
                     Hardware Fault Injection &amp; Graceful Degradation
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Triggering BLE, battery, or sensor noise faults degrades scoring to environment-only WBGT and logs an audit event.
                   </p>
                 </div>
@@ -936,7 +1113,7 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('clear_all', false)}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer whitespace-nowrap"
+                  className={`${SG_SURFACES.buttonSecondary} px-3 py-1.5 text-xs`}
                 >
                   Clear All Faults
                 </button>
@@ -947,10 +1124,10 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('bleDisconnected', !faults.bleDisconnected)}
-                  className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer ${
                     faults.bleDisconnected
-                      ? 'bg-rose-600 text-white border-rose-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#fa114f] text-white border-[#fa114f]'
+                      : 'bg-[#0c111d] text-slate-200 border-white/12 hover:bg-white/5'
                   }`}
                 >
                   <BluetoothOff className="w-4 h-4 shrink-0" />
@@ -961,10 +1138,10 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('lowBattery', !faults.lowBattery)}
-                  className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer ${
                     faults.lowBattery
-                      ? 'bg-amber-600 text-white border-amber-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                      : 'bg-[#0c111d] text-slate-200 border-white/12 hover:bg-white/5'
                   }`}
                 >
                   <BatteryWarning className="w-4 h-4 shrink-0" />
@@ -975,10 +1152,10 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('sensorNoise', !faults.sensorNoise)}
-                  className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer ${
                     faults.sensorNoise
-                      ? 'bg-amber-600 text-white border-amber-600'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#f59e0b] text-slate-950 border-[#f59e0b]'
+                      : 'bg-[#0c111d] text-slate-200 border-white/12 hover:bg-white/5'
                   }`}
                 >
                   <Activity className="w-4 h-4 shrink-0" />
@@ -989,10 +1166,10 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
                   type="button"
                   disabled={updating}
                   onClick={() => handleFaultToggle('gpsLoss', !faults.gpsLoss)}
-                  className={`min-h-[44px] px-3 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer ${
                     faults.gpsLoss
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-[#787aff] text-white border-[#787aff]'
+                      : 'bg-[#0c111d] text-slate-200 border-white/12 hover:bg-white/5'
                   }`}
                 >
                   <MapPinOff className="w-4 h-4 shrink-0" />
@@ -1001,19 +1178,19 @@ export function WorkerPage({ env, tempUnit }: WorkerPageProps) {
               </div>
 
               {/* Hardware-Agnostic BLE API Contract Inspector */}
-              <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-4 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowBleJson((v) => !v)}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer"
+                  className="text-xs font-medium text-slate-400 hover:text-white flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Code2 className="w-3.5 h-3.5" />
+                  <Code2 className="w-3.5 h-3.5 text-[#787aff]" />
                   <span>
                     {showBleJson ? 'Hide' : 'Inspect'} Hardware-Agnostic BLE Telemetry Contract (POST /api/ble/telemetry)
                   </span>
                 </button>
                 {showBleJson && (
-                  <pre className="mt-3 p-3 bg-slate-950 text-slate-200 rounded-lg text-[11px] font-mono overflow-x-auto leading-relaxed">
+                  <pre className="mt-3 p-3.5 bg-[#0c111d] border border-white/10 text-slate-200 rounded-xl text-[11px] font-mono overflow-x-auto leading-relaxed">
                     {JSON.stringify(latestFrame, null, 2)}
                   </pre>
                 )}

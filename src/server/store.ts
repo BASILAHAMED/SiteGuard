@@ -1,24 +1,27 @@
 import { predictCompositeTrajectory } from '../shared/forecastEngine.ts';
 import { RISK_TIER_THRESHOLDS, assessWorkerHeatRisk } from '../shared/riskEngine.ts';
-import type {
-  BLETelemetryFrame,
-  BreakRecord,
-  CustomAlertMessages,
-  EnvironmentalObservation,
-  FaultFlags,
-  ForecastOutput,
-  IncidentLogEntry,
-  RiskAssessment,
-  RiskTier,
-  ShiftRotationSuggestion,
-  SupportedLanguage,
-  TelemetryHistoryPoint,
-  TemperatureThresholdConfig,
-  VoiceIncidentSeverity,
-  WorkerAlertCopy,
-  WorkerContext,
-  WorkerStateSelf,
-  WorkerStatusPublic,
+import {
+  SUPPORTED_LANGUAGES,
+  type BLETelemetryFrame,
+  type BreakRecord,
+  type ComplianceNarrativeRecord,
+  type CustomAlertMessages,
+  type EnvironmentalObservation,
+  type FaultFlags,
+  type ForecastOutput,
+  type IncidentLogEntry,
+  type RiskAssessment,
+  type RiskTier,
+  type ShiftRotationSuggestion,
+  type SupportedLanguage,
+  type TelemetryHistoryPoint,
+  type TemperatureThresholdConfig,
+  type UaeSiteHubId,
+  type VoiceIncidentSeverity,
+  type WorkerAlertCopy,
+  type WorkerContext,
+  type WorkerStateSelf,
+  type WorkerStatusPublic,
 } from '../shared/types.ts';
 import {
   ABU_DHABI_COORDS,
@@ -27,6 +30,7 @@ import {
   synthesizeGemma4EdgeObservation,
 } from '../shared/edgeWeatherFallback.ts';
 import {
+  UAE_SITE_HUBS,
   computeOutdoorWbgt,
   getHistoricalObservationForHour,
   isInMiddayBreakWindow,
@@ -55,6 +59,7 @@ interface InternalWorkerRecord {
 class SiteGuardStore {
   private env: EnvironmentalObservation;
   private selectedHeatwaveHour = 11; // 11:00 GST peak ramp pre-midday break
+  private selectedHubId: UaeSiteHubId = 'abu_dhabi_mussafah';
   private lastKnownLiveEnv: EnvironmentalObservation | null = null;
   private simulateEdgeOffline = false;
   private envGeneration = 0;
@@ -62,11 +67,11 @@ class SiteGuardStore {
   private openWeatherDisabledKey: string | null = null;
   private workers = new Map<string, InternalWorkerRecord>();
   private incidents: IncidentLogEntry[] = [];
-  private complianceNarrative: { narrative: string; source: 'gemini' | 'template_fallback'; updatedAt: string } | null = null;
+  private complianceNarrative: ComplianceNarrativeRecord | null = null;
   private alertPolicy: TemperatureThresholdConfig;
 
   constructor() {
-    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour);
+    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour, this.selectedHubId);
     this.alertPolicy = this.createDefaultAlertPolicy();
     this.seedInitialCrew();
     void this.bootstrapLiveFeed();
@@ -88,6 +93,12 @@ class SiteGuardStore {
           amberAction: 'Site threshold reached: pause heavy tasks and take a 15-min shaded hydration break.',
           redHeadline: 'CRITICAL SITE HEAT LIMIT — STOP WORK',
           redAction: 'Critical WBGT limit exceeded: halt outdoor work immediately and move to AC recovery.',
+        },
+        ar: {
+          amberHeadline: 'تنبيه حرارة مخصص — استراحة في الظل',
+          amberAction: 'تم بلوغ حد الموقع: أوقف الأعمال الشاقة وخذ استراحة ترطيب لمدة 15 دقيقة في الظل.',
+          redHeadline: 'حد حرارة حرج بالموقع — أوقف العمل',
+          redAction: 'تم تجاوز حد WBGT الحرج: أوقف العمل الخارجي فوراً وانتقل إلى نقطة التبريد المكيفة.',
         },
         hi: {
           amberHeadline: 'कस्टम हीट अलर्ट — छाया में आराम करें',
@@ -113,6 +124,24 @@ class SiteGuardStore {
           redHeadline: 'KRITIKAL NA LIMITASYON — ITIGIL ANG TRABAHO',
           redAction: 'Lumampas sa ligtas na WBGT: itigil agad ang trabaho at pumunta sa malamig na lugar.',
         },
+        ta: {
+          amberHeadline: 'தள வெப்ப எச்சரிக்கை — நிழலில் ஓய்வெடுங்கள்',
+          amberAction: 'தள வெப்ப எல்லை எட்டப்பட்டது: கடின வேலையை நிறுத்தி 15 நிமிடம் நிழலில் தண்ணீர் குடிக்கவும்.',
+          redHeadline: 'அபாய வெப்ப எல்லை — உடனே வேலையை நிறுத்துங்கள்',
+          redAction: 'அபாய WBGT அளவைத் தாண்டியது: வெளிப்புற வேலையை உடனே நிறுத்தி ஏசி ஓய்வறைக்குச் செல்லுங்கள்.',
+        },
+        ml: {
+          amberHeadline: 'കസ്റ്റം ഹീറ്റ് അലർട്ട് — തണലിൽ വിശ്രമിക്കുക',
+          amberAction: 'സൈറ്റ് പരിധി എത്തി: ഭാരമേറിയ ജോലികൾ നിർത്തി 15 മിനിറ്റ് തണലിൽ വെള്ളം കുടിക്കുക.',
+          redHeadline: 'അതീവ താപ പരിധി — ഉടൻ ജോലി നിർത്തുക',
+          redAction: 'അപകടകരമായ WBGT പരിധി കടന്നു: ഉടൻ ജോലി നിർത്തി എസി വിശ്രമകേന്ദ്രത്തിലേക്ക് മാറുക.',
+        },
+        ne: {
+          amberHeadline: 'कस्टम ताप चेतावनी — छायामा विश्राम लिनुहोस्',
+          amberAction: 'साइट सीमा पुगेको छ: भारी काम रोक्नुहोस् र १५ मिनेट छायामा पानी पिउनुहोस्।',
+          redHeadline: 'गम्भीर ताप सीमा — काम तुरुन्त रोक्नुहोस्',
+          redAction: 'खतरनाक WBGT सीमा पार भयो: तुरुन्त काम रोकी एसी विश्रामस्थलमा जानुहोस्।',
+        },
       },
       updatedAt: new Date().toISOString(),
     };
@@ -126,8 +155,7 @@ class SiteGuardStore {
       return translations;
     }
     const next = { ...translations };
-    const langs: SupportedLanguage[] = ['en', 'hi', 'ur', 'bn', 'tl'];
-    for (const lang of langs) {
+    for (const lang of SUPPORTED_LANGUAGES) {
       const rule = this.alertPolicy.customMessages[lang];
       const existing = next[lang];
       if (!rule || !existing) continue;
@@ -300,6 +328,16 @@ class SiteGuardStore {
       let lastAssessment!: RiskAssessment;
       let lastFrame!: BLETelemetryFrame;
 
+      const seedBatMap: Record<string, number> = {
+        'W-101': 95,
+        'W-102': 79,
+        'W-103': 92,
+        'W-104': 68,
+        'W-105': 89,
+        'W-106': 84,
+      };
+      const baseSeedBat = seedBatMap[spec.context.workerId] ?? 90;
+
       for (let step = 0; step < 5; step++) {
         const minOffset = step * 3;
         const backSteps = 4 - step;
@@ -312,7 +350,7 @@ class SiteGuardStore {
           hrBpm: hr,
           skinTempC: skin,
           exertionIndex: spec.exertion,
-          batteryPct: 86,
+          batteryPct: Math.max(15, baseSeedBat - Math.floor(step / 2)),
           rssiDbm: -61,
           gpsFix: true,
           signalQuality: 0.97,
@@ -392,11 +430,30 @@ class SiteGuardStore {
     return this.env;
   }
 
-  public setHistoricalHour(hourGst: number): EnvironmentalObservation {
+  public getSelectedHubId(): UaeSiteHubId {
+    return this.selectedHubId;
+  }
+
+  public async setActiveHub(
+    hubId: UaeSiteHubId,
+    options?: { hourGst?: number; mode?: 'historical_heatwave' | 'live_abu_dhabi' }
+  ): Promise<EnvironmentalObservation> {
+    this.selectedHubId = UAE_SITE_HUBS[hubId] ? hubId : 'abu_dhabi_mussafah';
+    const targetMode = options?.mode ?? (typeof options?.hourGst === 'number' ? 'historical_heatwave' : this.env.mode);
+    if (targetMode === 'live_abu_dhabi' && typeof options?.hourGst !== 'number') {
+      return this.fetchLiveAbuDhabiWeather({ simulateOffline: this.simulateEdgeOffline });
+    }
+    return this.setHistoricalHour(options?.hourGst ?? this.selectedHeatwaveHour, this.selectedHubId);
+  }
+
+  public setHistoricalHour(hourGst: number, hubId?: UaeSiteHubId): EnvironmentalObservation {
+    if (hubId && UAE_SITE_HUBS[hubId]) {
+      this.selectedHubId = hubId;
+    }
     this.envGeneration += 1;
     this.simulateEdgeOffline = false;
     this.selectedHeatwaveHour = Math.max(6, Math.min(19, Math.round(hourGst)));
-    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour);
+    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour, this.selectedHubId);
     this.recomputeAllWorkersSync();
     return this.env;
   }
@@ -420,7 +477,10 @@ class SiteGuardStore {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
     try {
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${ABU_DHABI_COORDS.lat}&lon=${ABU_DHABI_COORDS.lon}&units=metric&appid=${encodeURIComponent(apiKey)}`;
+      const hub = UAE_SITE_HUBS[this.selectedHubId] ?? UAE_SITE_HUBS.abu_dhabi_mussafah;
+      const targetLat = hub.id === 'abu_dhabi_mussafah' ? ABU_DHABI_COORDS.lat : hub.lat;
+      const targetLon = hub.id === 'abu_dhabi_mussafah' ? ABU_DHABI_COORDS.lon : hub.lon;
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${targetLat}&lon=${targetLon}&units=metric&appid=${encodeURIComponent(apiKey)}`;
       const resp = await fetch(url, { signal: controller.signal });
       if (resp.status === 401 || resp.status === 403) {
         this.openWeatherDisabledKey = apiKey;
@@ -452,7 +512,7 @@ class SiteGuardStore {
       const windMs = Number(Math.max(0.4, json.wind?.speed ?? 2.8).toFixed(1));
       const obsDate = typeof json.dt === 'number' ? new Date(json.dt * 1000) : new Date();
       const { hourGst, minuteGst } = getAbuDhabiGstTimeParts(obsDate);
-      const solarWm2 = estimateAbuDhabiSolarWm2(hourGst, json.clouds?.all ?? 8);
+      const solarWm2 = Math.round(estimateAbuDhabiSolarWm2(hourGst, json.clouds?.all ?? 8) * hub.solarMultiplier);
       const { wetBulbC, globeTempC, wbgtC, heatIndexC } = computeOutdoorWbgt(
         airTemp,
         humidity,
@@ -464,9 +524,12 @@ class SiteGuardStore {
       return {
         timestampIso: obsDate.toISOString(),
         hourGst,
-        station: `Abu Dhabi Live Station (OpenWeatherMap · ${json.name || 'Abu Dhabi'} 24.45°N, 54.38°E)`,
-        lat: ABU_DHABI_COORDS.lat,
-        lon: ABU_DHABI_COORDS.lon,
+        station:
+          hub.id === 'abu_dhabi_mussafah'
+            ? `Abu Dhabi Live Station (OpenWeatherMap · ${json.name || 'Abu Dhabi'} 24.45°N, 54.38°E)`
+            : `${hub.station} (OpenWeatherMap · ${targetLat.toFixed(2)}°N, ${targetLon.toFixed(2)}°E)`,
+        lat: targetLat,
+        lon: targetLon,
         airTempC: Number(airTemp.toFixed(1)),
         relHumidityPct: Math.round(humidity),
         windSpeedMs: windMs,
@@ -476,7 +539,12 @@ class SiteGuardStore {
         wbgtC,
         heatIndexC,
         mode: 'live_abu_dhabi',
-        sourceLabel: 'Live Abu Dhabi Feed (OpenWeatherMap API)',
+        hubId: hub.id,
+        emirate: hub.emirate,
+        sourceLabel:
+          hub.id === 'abu_dhabi_mussafah'
+            ? 'Live Abu Dhabi Feed (OpenWeatherMap API)'
+            : `Live ${hub.shortLabel} Feed (OpenWeatherMap API)`,
         inUaeMiddayBreakWindow: isInMiddayBreakWindow(hourGst, minuteGst),
         feedStatus: 'live_abu_dhabi_feed',
         provider: 'OpenWeatherMap',
@@ -493,7 +561,10 @@ class SiteGuardStore {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4500);
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${ABU_DHABI_COORDS.lat}&longitude=${ABU_DHABI_COORDS.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,shortwave_radiation&timezone=Asia%2FDubai`;
+      const hub = UAE_SITE_HUBS[this.selectedHubId] ?? UAE_SITE_HUBS.abu_dhabi_mussafah;
+      const targetLat = hub.id === 'abu_dhabi_mussafah' ? ABU_DHABI_COORDS.lat : hub.lat;
+      const targetLon = hub.id === 'abu_dhabi_mussafah' ? ABU_DHABI_COORDS.lon : hub.lon;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,shortwave_radiation&timezone=Asia%2FDubai`;
       const resp = await fetch(url, { signal: controller.signal });
       if (!resp.ok) throw new Error(`Open-Meteo HTTP ${resp.status}`);
       const json = (await resp.json()) as {
@@ -521,10 +592,11 @@ class SiteGuardStore {
       const dt = new Date(cur.time);
       const hourGst = isNaN(dt.getHours()) ? fallbackHour : dt.getHours();
       const minGst = isNaN(dt.getMinutes()) ? fallbackMin : dt.getMinutes();
-      const solarWm2 =
-        typeof cur.shortwave_radiation === 'number' && Number.isFinite(cur.shortwave_radiation)
-          ? Math.round(cur.shortwave_radiation)
-          : estimateAbuDhabiSolarWm2(hourGst, 8);
+      const solarWm2 = Math.round(
+        (typeof cur.shortwave_radiation === 'number' && Number.isFinite(cur.shortwave_radiation)
+          ? cur.shortwave_radiation
+          : estimateAbuDhabiSolarWm2(hourGst, 8)) * hub.solarMultiplier
+      );
 
       const { wetBulbC, globeTempC, wbgtC, heatIndexC } = computeOutdoorWbgt(
         cur.temperature_2m,
@@ -537,9 +609,12 @@ class SiteGuardStore {
       return {
         timestampIso: cur.time,
         hourGst,
-        station: 'Abu Dhabi Live Station (Open-Meteo 24.45°N, 54.38°E)',
-        lat: ABU_DHABI_COORDS.lat,
-        lon: ABU_DHABI_COORDS.lon,
+        station:
+          hub.id === 'abu_dhabi_mussafah'
+            ? 'Abu Dhabi Live Station (Open-Meteo 24.45°N, 54.38°E)'
+            : `${hub.station} (Open-Meteo ${targetLat.toFixed(2)}°N, ${targetLon.toFixed(2)}°E)`,
+        lat: targetLat,
+        lon: targetLon,
         airTempC: Number(cur.temperature_2m.toFixed(1)),
         relHumidityPct: Math.round(cur.relative_humidity_2m),
         windSpeedMs: windMs,
@@ -549,7 +624,12 @@ class SiteGuardStore {
         wbgtC,
         heatIndexC,
         mode: 'live_abu_dhabi',
-        sourceLabel: 'Live Abu Dhabi Feed (Open-Meteo API)',
+        hubId: hub.id,
+        emirate: hub.emirate,
+        sourceLabel:
+          hub.id === 'abu_dhabi_mussafah'
+            ? 'Live Abu Dhabi Feed (Open-Meteo API)'
+            : `Live ${hub.shortLabel} Feed (Open-Meteo API)`,
         inUaeMiddayBreakWindow: isInMiddayBreakWindow(hourGst, minGst),
         feedStatus: 'live_abu_dhabi_feed',
         provider: 'Open-Meteo',
@@ -837,12 +917,14 @@ class SiteGuardStore {
       const nextHr = Math.min(182, Math.round(f.hrBpm + (rec.faults.bleDisconnected ? 0 : 6)));
       const nextSkin = Number(Math.min(37.9, f.skinTempC + (rec.faults.bleDisconnected ? 0 : 0.24)).toFixed(2));
       const nextExertion = Number(Math.min(9.5, f.exertionIndex + 0.2).toFixed(1));
+      const nextBat = rec.faults.lowBattery ? 6 : Math.max(14, f.batteryPct - 1);
       latest = await this.ingestBleTelemetry(
         {
           ...f,
           hrBpm: nextHr,
           skinTempC: nextSkin,
           exertionIndex: nextExertion,
+          batteryPct: nextBat,
           timestamp: new Date().toISOString(),
           simulatedClockMin: rec.simulatedClockMin + 3,
         },
@@ -1061,6 +1143,8 @@ class SiteGuardStore {
         supervisorDirective: rec.supervisorDirective,
         breaksTakenTodayMin: rec.context.breaksTakenTodayMin,
         hydrationCount: rec.context.hydrationCount,
+        deviceBatteryPct: rec.latestFrame.batteryPct,
+        simulatedClockMin: rec.simulatedClockMin,
         lastUpdated: rec.latestFrame.timestamp,
       };
     });
@@ -1207,9 +1291,10 @@ class SiteGuardStore {
       (breaks.filter((b) => b.compliant).length / Math.max(1, breaks.length)) * 100
     );
 
+    const hub = UAE_SITE_HUBS[this.selectedHubId] ?? UAE_SITE_HUBS.abu_dhabi_mussafah;
     return {
-      siteName: 'Abu Dhabi Mussafah Infrastructure Lot 07',
-      emirate: 'Abu Dhabi, UAE',
+      siteName: hub.name,
+      emirate: `${hub.emirate}, UAE`,
       regulationReference: 'UAE Ministerial Resolution No. 44 of 2022 (Midday Working Break: 12:30–15:00 GST, Jun–Sep)',
       env: this.env,
       compliantPct,
@@ -1220,21 +1305,34 @@ class SiteGuardStore {
     };
   }
 
-  public setComplianceNarrative(narrative: string, source: 'gemini' | 'template_fallback') {
-    this.complianceNarrative = { narrative, source, updatedAt: new Date().toISOString() };
+  public setComplianceNarrative(
+    narrative: string,
+    source: 'gemini' | 'template_fallback',
+    extras?: {
+      language?: 'en' | 'ar';
+      remediationActions?: string[];
+      auditReadinessStatus?: 'Audit Ready' | 'Remediation Needed';
+    }
+  ) {
+    this.complianceNarrative = {
+      narrative,
+      language: extras?.language ?? 'en',
+      remediationActions: extras?.remediationActions,
+      auditReadinessStatus: extras?.auditReadinessStatus,
+      source,
+      updatedAt: new Date().toISOString(),
+    };
     return this.complianceNarrative;
   }
 
   public getAlertPolicy(): TemperatureThresholdConfig {
+    const clonedMessages = {} as Record<SupportedLanguage, CustomAlertMessages>;
+    for (const lang of SUPPORTED_LANGUAGES) {
+      clonedMessages[lang] = { ...this.alertPolicy.customMessages[lang] };
+    }
     return {
       ...this.alertPolicy,
-      customMessages: {
-        en: { ...this.alertPolicy.customMessages.en },
-        hi: { ...this.alertPolicy.customMessages.hi },
-        ur: { ...this.alertPolicy.customMessages.ur },
-        bn: { ...this.alertPolicy.customMessages.bn },
-        tl: { ...this.alertPolicy.customMessages.tl },
-      },
+      customMessages: clonedMessages,
     };
   }
 
@@ -1257,8 +1355,7 @@ class SiteGuardStore {
     }
 
     const mergedMessages = { ...this.alertPolicy.customMessages };
-    const langs: SupportedLanguage[] = ['en', 'hi', 'ur', 'bn', 'tl'];
-    for (const lang of langs) {
+    for (const lang of SUPPORTED_LANGUAGES) {
       const patch = input.customMessages?.[lang];
       mergedMessages[lang] = {
         amberHeadline: (patch?.amberHeadline ?? mergedMessages[lang].amberHeadline).slice(0, 120),
@@ -1299,7 +1396,8 @@ class SiteGuardStore {
     this.envGeneration += 1;
     this.simulateEdgeOffline = false;
     this.selectedHeatwaveHour = 11;
-    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour);
+    this.selectedHubId = 'abu_dhabi_mussafah';
+    this.env = getHistoricalObservationForHour(this.selectedHeatwaveHour, this.selectedHubId);
     this.alertPolicy = this.createDefaultAlertPolicy();
     this.workers.clear();
     this.incidents = [];

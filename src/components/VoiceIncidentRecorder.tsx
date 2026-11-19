@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Send, Square } from 'lucide-react';
-import type {
-  SupportedLanguage,
-  VoiceIncidentSeverity,
-  WorkerStateSelf,
+import {
+  isRtlLanguage,
+  type SupportedLanguage,
+  type VoiceIncidentSeverity,
+  type WorkerStateSelf,
 } from '../shared/types';
 
 interface VoiceIncidentRecorderProps {
@@ -45,10 +46,14 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 
 const SPEECH_LOCALE_MAP: Record<SupportedLanguage, string> = {
   en: 'en-US',
+  ar: 'ar-AE',
   hi: 'hi-IN',
   ur: 'ur-PK',
   bn: 'bn-BD',
   tl: 'fil-PH',
+  ta: 'ta-IN',
+  ml: 'ml-IN',
+  ne: 'ne-NP',
 };
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -231,14 +236,14 @@ export function VoiceIncidentRecorder({
   return (
     <div
       data-testid="voice-incident-panel"
-      className="mt-4 pt-4 border-t border-slate-800 space-y-2.5"
+      className="mt-2 pt-2 space-y-2.5"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-slate-300">
+        <span className="text-xs font-semibold text-slate-200">
           Voice Safety Incident Report
         </span>
         {recording && (
-          <span className="text-[11px] font-mono tabular-nums text-rose-400">
+          <span className="text-[11px] font-mono tabular-nums text-[#ff5c8a]">
             REC {String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:
             {String(elapsedSec % 60).padStart(2, '0')}
           </span>
@@ -258,7 +263,7 @@ export function VoiceIncidentRecorder({
           disabled={recording || submitting}
           value={severity}
           onChange={(e) => setSeverity(e.target.value as VoiceIncidentSeverity)}
-          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-100 focus:outline-none focus:border-slate-500 disabled:opacity-60 cursor-pointer"
+          className="flex-1 bg-[#212121] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-100 focus:outline-none focus:border-[#787aff] disabled:opacity-60 cursor-pointer"
         >
           <option value="Low">Low — Minor observation</option>
           <option value="Medium">Medium — Needs shade / check</option>
@@ -272,16 +277,16 @@ export function VoiceIncidentRecorder({
             type="button"
             disabled={submitting}
             onClick={handleStartRecording}
-            className="flex-1 min-h-[40px] px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-slate-100 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 min-h-[40px] px-3 py-2 rounded-xl border border-[#787aff]/50 bg-[#787aff]/20 hover:bg-[#787aff]/30 active:scale-[0.99] disabled:opacity-50 text-slate-100 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <Mic className="w-4 h-4 text-sky-400 shrink-0" />
+            <Mic className="w-4 h-4 text-[#787aff] shrink-0" />
             <span>{submitting ? 'Transcribing Incident...' : 'Record Voice Incident'}</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={handleStopRecording}
-            className="flex-1 min-h-[40px] px-3 py-2 rounded-xl border border-rose-500 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+            className="flex-1 min-h-[40px] px-3 py-2 rounded-xl border border-[#fa114f] bg-[#fa114f] hover:brightness-110 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <Square className="w-3.5 h-3.5 fill-current shrink-0" />
             <span>Stop &amp; Transcribe</span>
@@ -293,6 +298,7 @@ export function VoiceIncidentRecorder({
       <div className="flex items-center gap-2">
         <input
           type="text"
+          dir={isRtlLanguage(language) ? 'rtl' : 'ltr'}
           aria-label="Voice incident transcript or fallback note"
           value={draftTranscript}
           onChange={(e) => {
@@ -300,13 +306,13 @@ export function VoiceIncidentRecorder({
             setDraftTranscript(e.target.value);
           }}
           placeholder="Optional note or live spoken preview (e.g., dizziness in Zone A)..."
-          className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-slate-600"
+          className="flex-1 bg-[#212121] border border-white/12 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-[#787aff]"
         />
         <button
           type="button"
           disabled={recording || submitting || !draftTranscript.trim()}
           onClick={() => submitVoicePayload(null, draftTranscript, severity)}
-          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-medium flex items-center gap-1 cursor-pointer"
+          className="px-2.5 py-1.5 rounded-xl bg-[#787aff] hover:bg-[#898bff] active:scale-[0.99] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1 transition-all cursor-pointer"
         >
           <Send className="w-3 h-3" />
           <span>Send</span>
@@ -314,7 +320,7 @@ export function VoiceIncidentRecorder({
       </div>
 
       {micError && (
-        <div role="alert" className="text-[11px] text-amber-300 bg-amber-950/50 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+        <div role="alert" className="text-[11px] text-amber-200 bg-[#f59e0b]/15 border border-[#f59e0b]/40 rounded-xl px-2.5 py-1.5">
           {micError}
         </div>
       )}
@@ -322,13 +328,15 @@ export function VoiceIncidentRecorder({
       {lastLogged && (
         <div
           data-testid="voice-incident-logged"
-          className="text-[11px] text-sky-200 bg-sky-950/60 border border-sky-500/40 rounded-lg px-2.5 py-2 leading-relaxed"
+          className="text-[11px] text-slate-100 bg-[#787aff]/15 border border-[#787aff]/45 rounded-xl px-2.5 py-2 leading-relaxed"
         >
-          <div className="font-mono font-semibold text-sky-300">
+          <div className="font-mono font-semibold text-[#a5a7ff]">
             VOICE INCIDENT LOGGED · {lastLogged.severity.toUpperCase()} (
             {lastLogged.source === 'gemini_transcribe' ? 'Gemini Transcribe' : 'Logged'})
           </div>
-          <div className="mt-0.5">&ldquo;{lastLogged.transcript}&rdquo;</div>
+          <div dir={isRtlLanguage(language) ? 'rtl' : 'ltr'} className="mt-0.5">
+            &ldquo;{lastLogged.transcript}&rdquo;
+          </div>
         </div>
       )}
     </div>

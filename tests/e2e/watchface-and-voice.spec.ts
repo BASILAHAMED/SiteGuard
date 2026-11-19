@@ -154,6 +154,10 @@ test.describe('Circular Watch Face, AOD Mode, Boundary Enforcement & Voice Incid
     });
 
     await page.goto('/worker');
+    // Raise Siri-style Voice Sheet over Watch Screen
+    await page.getByTestId('open-voice-sheet-btn').click();
+    await expect(page.getByTestId('watch-voice-sheet')).toBeVisible();
+
     const severitySelect = page.getByLabel('Incident Severity');
     await expect(severitySelect).toBeVisible();
     await expect(severitySelect).toHaveValue('Medium');
@@ -182,5 +186,136 @@ test.describe('Circular Watch Face, AOD Mode, Boundary Enforcement & Voice Incid
     await expect(
       page.getByText(/Voice Incident \(EN · High\): "Worker reporting dizziness near Zone A rebar deck\."/i)
     ).toBeVisible();
+  });
+
+  test('AppCarousel nearest-to-center scroll focus tracks cards and auto-focuses Stop-Work Alert only when live API tier is Red', async ({
+    page,
+  }) => {
+    await page.goto('/worker');
+    await expect(page.getByTestId('apple-watch-shell')).toBeVisible();
+
+    // Tap WatchFace center score -> opens AppCarousel
+    await page.getByTestId('watchface-center-score').click();
+    await expect(page.getByTestId('app-carousel-screen')).toBeVisible();
+
+    // W-101 is Green -> Heat Risk Forecast centered by default, Stop-Work dimmed & "None active"
+    const forecastCard = page.getByTestId('carousel-card-heat-risk-forecast');
+    const stopWorkCard = page.getByTestId('carousel-card-stop-work-alert');
+    const compositeCard = page.getByTestId('carousel-card-composite-strain');
+
+    await expect(forecastCard).toHaveAttribute('data-focused', 'true');
+    await expect(stopWorkCard).toHaveAttribute('data-focused', 'false');
+    await expect(stopWorkCard).toContainText('None active');
+
+    // Scroll carousel stack to top -> nearest-to-center shifts focus to Composite Strain
+    const scrollBox = page.getByTestId('app-carousel-scroll');
+    await scrollBox.evaluate((el) => {
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(compositeCard).toHaveAttribute('data-focused', 'true');
+    await expect(forecastCard).toHaveAttribute('data-focused', 'false');
+
+    // Return to gauge and switch unit to W-104 (real Red critical strain from API)
+    await page.getByRole('button', { name: /Back to Heat Watch Gauge/i }).click();
+    const w104Resp = page.waitForResponse((r) => r.url().includes('/api/worker/W-104/state'));
+    await page.locator('#worker-select').selectOption('W-104');
+    await w104Resp;
+    await expect(page.getByText('RED · STOP WORK')).toBeVisible();
+
+    // Re-open carousel -> Stop-Work Alert auto-focuses (full opacity) with #fa114f value accent
+    await page.getByTestId('watchface-center-score').click();
+    await expect(stopWorkCard).toHaveAttribute('data-focused', 'true');
+    await expect(stopWorkCard).toContainText('ACTIVE — STOP WORK');
+    const valueEl = stopWorkCard.getByText('ACTIVE — STOP WORK');
+    await expect(valueEl).toHaveCSS('color', 'rgb(250, 17, 79)');
+  });
+
+  test('Crown opens bubble App Grid, Notification Banner offers inline check-in, and 600ms Side-Button SOS slider rejects partial drags', async ({
+    page,
+  }) => {
+    await page.goto('/worker');
+
+    // 1. Digital Crown tap opens 6-bubble App Grid
+    await page.getByTestId('digital-crown').click();
+    const appGrid = page.getByTestId('watch-app-grid');
+    await expect(appGrid).toBeVisible();
+    await expect(appGrid.getByRole('button')).toHaveCount(6);
+    await appGrid.getByRole('button', { name: 'Heat Gauge' }).click();
+    await expect(page.getByTestId('watchface-active')).toBeVisible();
+
+    // 2. Step clock on W-101 -> Amber escalation slides down Watch Notification Banner with inline actions
+    const stepResp = page.waitForResponse((r) => r.url().includes('/api/worker/W-101/sim-step'));
+    await page.getByRole('button', { name: '+6 min Step' }).click();
+    await stepResp;
+
+    const alertBanner = page.getByTestId('watch-alert-banner');
+    await expect(alertBanner).toBeVisible();
+    const inlineAckResp = page.waitForResponse(
+      (r) => r.url().includes('/api/worker/W-101/checkin') && r.request().method() === 'POST'
+    );
+    await alertBanner.getByTestId('watch-banner-okay').click();
+    await inlineAckResp;
+    await expect(page.getByRole('status')).toContainText('CHECK-IN CONFIRMED · WORKER OKAY');
+
+    // 3. Side-Button quick tap (<200ms) must NOT trigger SOS overlay
+    const sideBtn = page.getByTestId('watch-side-button');
+    await sideBtn.dispatchEvent('pointerdown');
+    await page.waitForTimeout(150);
+    await sideBtn.dispatchEvent('pointerup');
+    await expect(page.getByTestId('watch-sos-overlay')).toHaveCount(0);
+
+    // 4. Side-Button click-and-hold (600ms+) opens SOS Slide-to-Confirm overlay
+    const box = await sideBtn.boundingBox();
+    if (!box) throw new Error('Side button boundingBox unavailable');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(680);
+    await page.mouse.up();
+    await expect(page.getByTestId('watch-sos-overlay')).toBeVisible();
+
+    // Track network checkin calls during partial drag -> MUST remain 0
+    let sosCalls = 0;
+    page.on('request', (req) => {
+      if (req.url().includes('/api/worker/W-101/checkin') && req.method() === 'POST') {
+        sosCalls += 1;
+      }
+    });
+
+    const track = page.getByTestId('sos-slider-track');
+    const thumb = page.getByTestId('sos-slider-thumb');
+    const trackBox = await track.boundingBox();
+    const thumbBox = await thumb.boundingBox();
+    if (!trackBox || !thumbBox) throw new Error('SOS slider boundingBox unavailable');
+
+    const startX = thumbBox.x + thumbBox.width / 2;
+    const y = thumbBox.y + thumbBox.height / 2;
+
+    // Partial drag (~50% of track) + release -> MUST NOT fire Need Help; snaps back to 0
+    await page.mouse.move(startX, y);
+    await page.mouse.down();
+    await page.mouse.move(trackBox.x + trackBox.width * 0.5, y, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+
+    expect(sosCalls).toBe(0);
+    await expect(page.getByTestId('watch-sos-overlay')).toBeVisible();
+    await expect(thumb).toHaveAttribute('aria-valuenow', '0');
+
+    // Full drag to end of track + release -> triggers Need Help SOS check-in
+    const freshThumbBox = await thumb.boundingBox();
+    if (!freshThumbBox) throw new Error('Thumb boundingBox unavailable');
+    const helpResp = page.waitForResponse(
+      (r) => r.url().includes('/api/worker/W-101/checkin') && r.request().method() === 'POST'
+    );
+    await page.mouse.move(freshThumbBox.x + freshThumbBox.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(trackBox.x + trackBox.width - 8, y, { steps: 10 });
+    await page.mouse.up();
+    await helpResp;
+
+    expect(sosCalls).toBe(1);
+    await expect(page.getByTestId('watch-sos-overlay')).toHaveCount(0);
+    await expect(page.getByRole('status')).toContainText('SOS ACTIVE · SUPERVISOR & MEDIC NOTIFIED');
   });
 });

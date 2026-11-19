@@ -166,4 +166,107 @@ test.describe('Worker Flow & Cross-Page Check-In', () => {
       .click();
     await expect(page.getByText('Air 44.4°C')).toBeVisible();
   });
+
+  test('triggers multilingual voice-synthesis alerts when heat thresholds are exceeded', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const spokenLog: Array<{ text: string; lang: string }> = [];
+      (window as unknown as { __spokenAlerts: typeof spokenLog }).__spokenAlerts = spokenLog;
+      class MockUtterance {
+        text: string;
+        lang = 'en-US';
+        rate = 1;
+        pitch = 1;
+        voice: SpeechSynthesisVoice | null = null;
+        onend: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(text: string) {
+          this.text = text;
+        }
+      }
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+        configurable: true,
+        writable: true,
+        value: MockUtterance,
+      });
+      Object.defineProperty(window, 'speechSynthesis', {
+        configurable: true,
+        writable: true,
+        value: {
+          cancel: () => {},
+          getVoices: () => [],
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          speak: (u: { text: string; lang: string }) => {
+            spokenLog.push({ text: u.text, lang: u.lang });
+          },
+        },
+      });
+    });
+
+    await page.goto('/worker');
+    await expect(page.getByTestId('worker-voice-alert-status')).toContainText('ARMED · STANDBY');
+
+    const initialCount = await page.evaluate(
+      () => (window as unknown as { __spokenAlerts: Array<{ text: string; lang: string }> }).__spokenAlerts.length
+    );
+    expect(initialCount).toBe(0);
+
+    // Trigger Critical heat threshold via BLE Simulator Critical preset
+    await page.getByRole('button', { name: /Developer \/ BLE Simulator/i }).click();
+    const redPost = page.waitForResponse(
+      (r) => r.url().includes('/api/ble/telemetry') && r.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Critical', exact: true }).click();
+    await redPost;
+
+    await expect(page.getByText('RED · STOP WORK')).toBeVisible();
+    await expect(page.getByTestId('worker-voice-alert-status')).toContainText(
+      /AUDIBLE ALERT TRIGGERED|SPEAKING ALERT/i
+    );
+
+    const afterRed = await page.evaluate(
+      () => (window as unknown as { __spokenAlerts: Array<{ text: string; lang: string }> }).__spokenAlerts
+    );
+    expect(afterRed.length).toBeGreaterThanOrEqual(1);
+    expect(afterRed[afterRed.length - 1].lang).toBe('en-US');
+    expect(afterRed[afterRed.length - 1].text).toMatch(/STOP WORK/i);
+
+    // Switch worker language to Tamil while threshold is exceeded -> speaks immediately in ta-IN
+    const taResp = page.waitForResponse(
+      (r) => r.url().includes('/api/worker/W-101/language') && r.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'தமிழ்' }).click();
+    await taResp;
+    await expect(page.getByTestId('worker-voice-locale')).toContainText('ta-IN');
+
+    const afterTa = await page.evaluate(
+      () => (window as unknown as { __spokenAlerts: Array<{ text: string; lang: string }> }).__spokenAlerts
+    );
+    expect(afterTa[afterTa.length - 1].lang).toBe('ta-IN');
+    expect(afterTa[afterTa.length - 1].text).toMatch(/[\u0B80-\u0BFF]{3,}/);
+
+    // Switch worker language to Arabic while threshold is exceeded -> speaks immediately in ar-AE
+    const arResp = page.waitForResponse(
+      (r) => r.url().includes('/api/worker/W-101/language') && r.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'العربية' }).click();
+    await arResp;
+
+    const afterAr = await page.evaluate(
+      () => (window as unknown as { __spokenAlerts: Array<{ text: string; lang: string }> }).__spokenAlerts
+    );
+    expect(afterAr[afterAr.length - 1].lang).toBe('ar-AE');
+    expect(afterAr[afterAr.length - 1].text).toMatch(/[\u0600-\u06FF]{3,}/);
+
+    // Mute toggle stops/silences auto alerts cleanly
+    await page.getByTestId('worker-voice-alert-toggle').click();
+    await expect(page.getByTestId('worker-voice-alert-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await expect(page.getByTestId('worker-voice-alert-status')).toContainText(/muted/i);
+  });
 });
+

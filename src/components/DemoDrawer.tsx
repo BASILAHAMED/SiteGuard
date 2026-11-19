@@ -12,7 +12,7 @@ const DEMO_STEPS = [
     title: 'Prospective Early Warning Fires',
     route: '/worker',
     detail:
-      'Select W-101 (Steel Fixer, unacclimatized). Notice the wearable starts Green, yet the deterministic forecast projects an Amber crossing in ~12–18 min with Gemini multilingual guidance in Hindi/Urdu/Bengali/Tagalog.',
+      'Select W-101 (Steel Fixer, unacclimatized 3 days). Notice the wearable starts Green, yet the deterministic forecast projects an Amber crossing in ~12–18 min with Gemini multilingual guidance in Hindi/Urdu/Bengali/Tagalog.',
   },
   {
     step: '02',
@@ -50,13 +50,13 @@ export function DemoDrawer({ open, onClose }: DemoDrawerProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/35">
-      <div className="w-full max-w-md bg-white h-full border-l border-slate-200 flex flex-col justify-between overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/65 backdrop-blur-xs">
+      <div className="w-full max-w-md bg-[#141821] text-slate-100 h-full border-l border-white/10 flex flex-col justify-between overflow-y-auto shadow-2xl">
         <div className="p-6">
-          <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
+          <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">3-Minute Demo Walkthrough</h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <h2 className="text-lg font-bold text-white">3-Minute Demo Walkthrough</h2>
+              <p className="text-xs text-slate-400 mt-1">
                 GenOS Team · Challenge 07: Climate-Resilient Worker Health
               </p>
             </div>
@@ -64,7 +64,7 @@ export function DemoDrawer({ open, onClose }: DemoDrawerProps) {
               type="button"
               onClick={onClose}
               aria-label="Close demo guide"
-              className="p-2 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 cursor-pointer"
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 cursor-pointer transition-all active:scale-[0.99]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -72,9 +72,9 @@ export function DemoDrawer({ open, onClose }: DemoDrawerProps) {
 
           <ol className="mt-6 space-y-5">
             {DEMO_STEPS.map((item) => (
-              <li key={item.step} className="pb-5 border-b border-slate-100 last:border-none">
+              <li key={item.step} className="pb-5 border-b border-white/8 last:border-none">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono font-semibold text-slate-500">
+                  <span className="text-xs font-mono font-semibold text-[#787aff]">
                     Step {item.step}
                   </span>
                   <button
@@ -83,22 +83,22 @@ export function DemoDrawer({ open, onClose }: DemoDrawerProps) {
                       navigate(item.route);
                       onClose();
                     }}
-                    className="text-xs font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-600 cursor-pointer"
+                    className="text-xs font-semibold text-[#787aff] underline underline-offset-2 hover:text-white cursor-pointer active:scale-[0.99]"
                   >
                     Go to {item.route}
                   </button>
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900 mt-1">{item.title}</h3>
-                <p className="text-xs text-slate-600 leading-relaxed mt-1">{item.detail}</p>
+                <h3 className="text-sm font-semibold text-white mt-1">{item.title}</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mt-1">{item.detail}</p>
               </li>
             ))}
           </ol>
         </div>
 
-        <div className="p-6 border-t border-slate-200 bg-slate-50">
-          <p className="text-xs text-slate-500 leading-relaxed">
+        <div className="p-6 border-t border-white/10 bg-[#0B1120]">
+          <p className="text-xs text-slate-400 leading-relaxed">
             Hardware-agnostic contract: UI simulator sliders push to{' '}
-            <code className="font-mono text-slate-700">POST /api/ble/telemetry</code> using the
+            <code className="font-mono text-slate-200">POST /api/ble/telemetry</code> using the
             identical schema expected from physical BLE wearable gateways.
           </p>
         </div>

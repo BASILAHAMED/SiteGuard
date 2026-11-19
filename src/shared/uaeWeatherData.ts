@@ -1,4 +1,59 @@
-import type { EnvironmentalObservation } from './types.ts';
+import type { EnvironmentalObservation, UaeSiteHubId, UaeSiteHubSpec } from './types.ts';
+
+export const UAE_SITE_HUBS: Record<UaeSiteHubId, UaeSiteHubSpec> = {
+  abu_dhabi_mussafah: {
+    id: 'abu_dhabi_mussafah',
+    emirate: 'Abu Dhabi',
+    name: 'Abu Dhabi Mussafah Infrastructure Lot 07',
+    shortLabel: 'Abu Dhabi · Mussafah',
+    station: 'Abu Dhabi Mussafah Industrial',
+    lat: 24.3712,
+    lon: 54.5097,
+    airDeltaC: 0,
+    humidityDeltaPct: 0,
+    solarMultiplier: 1.0,
+    microclimateNote: 'Baseline industrial steel & concrete corridor',
+  },
+  dubai_marina: {
+    id: 'dubai_marina',
+    emirate: 'Dubai',
+    name: 'Dubai Marina Tower Deck Site 04',
+    shortLabel: 'Dubai · Marina Tower',
+    station: 'Dubai Marina High-Rise Zone',
+    lat: 25.0805,
+    lon: 55.1403,
+    airDeltaC: 0.4,
+    humidityDeltaPct: 8,
+    solarMultiplier: 1.08,
+    microclimateNote: 'Coastal humidity + glass facade solar reflection',
+  },
+  dubai_jebel_ali: {
+    id: 'dubai_jebel_ali',
+    emirate: 'Dubai',
+    name: 'Dubai Jebel Ali Port Logistics Pier',
+    shortLabel: 'Dubai · Jebel Ali Port',
+    station: 'Dubai Jebel Ali Marine Tarmac',
+    lat: 25.0091,
+    lon: 55.0604,
+    airDeltaC: 0.9,
+    humidityDeltaPct: 5,
+    solarMultiplier: 1.05,
+    microclimateNote: 'Exposed tarmac & steel container radiant load',
+  },
+  dubai_expo_city: {
+    id: 'dubai_expo_city',
+    emirate: 'Dubai',
+    name: 'Dubai Expo City Solar & Civil Corridor',
+    shortLabel: 'Dubai · Expo City Solar',
+    station: 'Dubai South Desert Array',
+    lat: 24.9609,
+    lon: 55.1515,
+    airDeltaC: 1.6,
+    humidityDeltaPct: -4,
+    solarMultiplier: 1.12,
+    microclimateNote: 'Peak inland desert UV & dry thermal stress',
+  },
+};
 
 /**
  * Historical Abu Dhabi Mussafah Industrial peak summer heatwave hourly curve
@@ -286,15 +341,58 @@ export function isInMiddayBreakWindow(hourGst: number, minuteGst = 0): boolean {
   return totalMin >= 12 * 60 + 30 && totalMin < 15 * 60;
 }
 
-export function getHistoricalObservationForHour(hourGst: number): EnvironmentalObservation {
+export function getHistoricalObservationForHour(
+  hourGst: number,
+  hubId: UaeSiteHubId = 'abu_dhabi_mussafah'
+): EnvironmentalObservation {
   const clamped = Math.max(6, Math.min(19, Math.round(hourGst)));
   const row =
     HISTORICAL_UAE_HEATWAVE_CURVE.find((r) => r.hourGst === clamped) ??
     HISTORICAL_UAE_HEATWAVE_CURVE[5];
+  const hub = UAE_SITE_HUBS[hubId] ?? UAE_SITE_HUBS.abu_dhabi_mussafah;
+
+  if (hub.id === 'abu_dhabi_mussafah') {
+    return {
+      ...row,
+      mode: 'historical_heatwave',
+      hubId: hub.id,
+      emirate: hub.emirate,
+      sourceLabel: 'Historical UAE Summer Heatwave Record (Abu Dhabi Mussafah CSV)',
+      inUaeMiddayBreakWindow: isInMiddayBreakWindow(row.hourGst, 0),
+      feedStatus: 'historical_calibration',
+      provider: 'Historical UAE CSV',
+      edgeOfflineActive: false,
+      lastLiveSyncIso: null,
+      resilienceReason: null,
+    };
+  }
+
+  const airTempC = Number((row.airTempC + hub.airDeltaC).toFixed(1));
+  const relHumidityPct = Math.max(15, Math.min(90, Math.round(row.relHumidityPct + hub.humidityDeltaPct)));
+  const solarWm2 = Math.round(row.solarWm2 * hub.solarMultiplier);
+  const { wetBulbC, globeTempC, wbgtC, heatIndexC } = computeOutdoorWbgt(
+    airTempC,
+    relHumidityPct,
+    row.windSpeedMs,
+    solarWm2
+  );
+
   return {
     ...row,
+    station: `${hub.station} (UAE Summer Simulation)`,
+    lat: hub.lat,
+    lon: hub.lon,
+    airTempC,
+    relHumidityPct,
+    solarWm2,
+    wetBulbC,
+    globeTempC,
+    wbgtC,
+    heatIndexC,
     mode: 'historical_heatwave',
-    sourceLabel: 'Historical UAE Summer Heatwave Record (Abu Dhabi Mussafah CSV)',
+    hubId: hub.id,
+    emirate: hub.emirate,
+    sourceLabel: `${hub.shortLabel} Thermal Simulation (${hub.microclimateNote})`,
     inUaeMiddayBreakWindow: isInMiddayBreakWindow(row.hourGst, 0),
     feedStatus: 'historical_calibration',
     provider: 'Historical UAE CSV',

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 import { DemoDrawer } from './components/DemoDrawer';
+import { PageTransition } from './components/PageTransition';
 import { TopNav } from './components/TopNav';
 import { CompliancePage } from './pages/CompliancePage';
 import { ForecastValidationPage } from './pages/ForecastValidationPage';
@@ -31,6 +33,37 @@ function persistCachedEnv(obs: EnvironmentalObservation) {
   } catch {
     // Ignore storage write errors in restricted contexts
   }
+}
+
+function AnimatedRoutes({
+  env,
+  tempUnit,
+  onEnvUpdated,
+}: {
+  env: EnvironmentalObservation | null;
+  tempUnit: TemperatureUnit;
+  onEnvUpdated: (nextEnv: EnvironmentalObservation) => void;
+}) {
+  const location = useLocation();
+  return (
+    <PageTransition routeKey={location.pathname}>
+      <Routes location={location}>
+        <Route path="/" element={<Navigate to="/worker" replace />} />
+        <Route path="/worker" element={<WorkerPage env={env} tempUnit={tempUnit} />} />
+        <Route
+          path="/supervisor"
+          element={<SupervisorPage env={env} tempUnit={tempUnit} onEnvUpdated={onEnvUpdated} />}
+        />
+        <Route
+          path="/compliance"
+          element={<CompliancePage onEnvUpdated={onEnvUpdated} tempUnit={tempUnit} />}
+        />
+        <Route path="/validation" element={<ValidationPage />} />
+        <Route path="/forecast-validation" element={<ForecastValidationPage />} />
+        <Route path="*" element={<Navigate to="/worker" replace />} />
+      </Routes>
+    </PageTransition>
+  );
 }
 
 export default function App() {
@@ -176,40 +209,34 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-        <TopNav
-          env={env}
-          onChangeEnvMode={handleChangeEnvMode}
-          envLoading={envLoading}
-          onOpenDemo={() => setDemoOpen(true)}
-          tempUnit={tempUnit}
-          onToggleTempUnit={handleToggleTempUnit}
-        />
+    <MotionConfig reducedMotion="user">
+      <BrowserRouter>
+        <div className="min-h-screen flex flex-col text-slate-100">
+          <TopNav
+            env={env}
+            onChangeEnvMode={handleChangeEnvMode}
+            envLoading={envLoading}
+            onOpenDemo={() => setDemoOpen(true)}
+            tempUnit={tempUnit}
+            onToggleTempUnit={handleToggleTempUnit}
+          />
 
-        <div className="flex-1">
-          <Routes>
-            <Route path="/" element={<Navigate to="/worker" replace />} />
-            <Route path="/worker" element={<WorkerPage env={env} tempUnit={tempUnit} />} />
-            <Route path="/supervisor" element={<SupervisorPage env={env} tempUnit={tempUnit} />} />
-            <Route path="/compliance" element={<CompliancePage />} />
-            <Route path="/validation" element={<ValidationPage />} />
-            <Route path="/forecast-validation" element={<ForecastValidationPage />} />
-            <Route path="*" element={<Navigate to="/worker" replace />} />
-          </Routes>
-        </div>
-
-        <footer className="no-print border-t border-slate-200 bg-white mt-12">
-          <div className="max-w-[1280px] mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
-            <span>SiteGuard by GenOS Team · Future Health Digital Innovation Challenge 07</span>
-            <span>
-              Moran et al. (1998) PSI + ACGIH WBGT TLV · UAE Ministerial Resolution No. 44 (12:30–15:00 GST)
-            </span>
+          <div className="flex-1">
+            <AnimatedRoutes env={env} tempUnit={tempUnit} onEnvUpdated={applyEnv} />
           </div>
-        </footer>
 
-        <DemoDrawer open={demoOpen} onClose={() => setDemoOpen(false)} />
-      </div>
-    </BrowserRouter>
+          <footer className="no-print border-t border-white/10 bg-[#0B1120]/90 mt-12">
+            <div className="max-w-[1280px] mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
+              <span>SiteGuard by GenOS Team · Future Health Digital Innovation Challenge 07</span>
+              <span className="font-mono text-[11px] text-slate-500">
+                Moran et al. (1998) PSI + ACGIH WBGT TLV · UAE Ministerial Resolution No. 44 (12:30–15:00 GST)
+              </span>
+            </div>
+          </footer>
+
+          <DemoDrawer open={demoOpen} onClose={() => setDemoOpen(false)} />
+        </div>
+      </BrowserRouter>
+    </MotionConfig>
   );
 }
