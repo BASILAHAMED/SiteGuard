@@ -149,10 +149,14 @@ export function WatchShell({
     onSideDown?.();
   };
   const sideUp = () => {
-    setSidePressed((was) => {
-      if (was) onSideUp?.();
-      return false;
-    });
+    // Read `sidePressed` directly rather than inside the setState updater:
+    // React may invoke a functional updater eagerly (its bailout-equality
+    // check) at the dispatchSetState call site, so a side effect placed
+    // inside one can fire synchronously mid-render of a sibling/ancestor —
+    // which is exactly what tripped the "update SmartWatch while rendering
+    // WatchShell" warning here.
+    if (sidePressed) onSideUp?.();
+    setSidePressed(false);
   };
 
   const knurl = 'repeating-linear-gradient(0deg, #5b5f66 0 1.5px, #2a2d33 1.5px 3px)';
