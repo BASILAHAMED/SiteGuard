@@ -173,6 +173,7 @@ const NO_CROSSING_PROJECTED_COPY: Record<SupportedLanguage, string> = {
   ta: 'தற்போதைய போக்கின் படி ஆம்பர் அல்லது சிவப்பு அபாய எல்லையைத் தாண்டும் நிலை இல்லை.',
   ml: 'നിലവിലെ പ്രവണത അനുസരിച്ച് ആംബർ അല്ലെങ്കിൽ റെഡ് പരിധി കടക്കാൻ സാധ്യതയില്ല.',
   ne: 'हालको ट्रेन्ड अनुसार एम्बर वा रातो सीमा पार हुने अनुमान छैन।',
+  si: 'වත්මන් ප්‍රවණතාවය අනුව දැනට ඇම්බර් හෝ රතු සීමාව පසු කරනු ඇතැයි අපේක්ෂා නොවේ.',
 };
 
 const INSUFFICIENT_TREND_COPY: Record<SupportedLanguage, string> = {
@@ -185,6 +186,7 @@ const INSUFFICIENT_TREND_COPY: Record<SupportedLanguage, string> = {
   ta: 'முன்னறிவிப்புக்குப் போதுமான தரவு இல்லை — வழக்கமான இடைவேளைகளைப் பின்பற்றவும்.',
   ml: 'പ്രവചനത്തിന് ആവശ്യമായ ട്രെൻഡ് ഡാറ്റ ലഭ്യമല്ല — നിശ്ചിത ഇടവേളകളിൽ വിശ്രമിക്കുക.',
   ne: 'पूर्वानुमानका लागि पर्याप्त ट्रेन्ड डेटा छैन — नियमित विश्राम समय पालना गर्नुहोस्।',
+  si: 'පුරෝකථනය සඳහා ප්‍රමාණවත් ප්‍රවණතා දත්ත නැත — නියමිත විවේක වේලාවන් අනුගමනය කරන්න.',
 };
 
 function buildLocalizedProactiveNote(
@@ -220,6 +222,8 @@ function buildLocalizedProactiveNote(
         return `നിലവിലെ വേഗത്തിൽ ~${amberEta} മിനിറ്റിനുള്ളിൽ ആംബർ പരിധിയിലെത്താം — ${context.plannedBreakTime} വരെ കാക്കാതെ തണലിൽ വിശ്രമം തുടങ്ങുക.`;
       case 'ne':
         return `हालको गतिमा ~${amberEta} मिनेटमा एम्बर स्तर पुग्न सक्छ — ${context.plannedBreakTime} नकुरी छिट्टै छायामा विश्राम सुरु गर्नुहोस्।`;
+      case 'si':
+        return `වත්මන් වේගයේදී ~${amberEta} මිනිත්තුවකින් ඇම්බර් මට්ටමට ළඟා විය හැක — ${context.plannedBreakTime} එනතුරු නොඉඳ දැන්ම හෙවණේ විවේකය අරඹන්න.`;
     }
   }
 
@@ -243,6 +247,8 @@ function buildLocalizedProactiveNote(
         return `ചൂട് സമ്മർദ്ദം ഉയരുന്നു; ഇപ്പോൾ തണലിൽ വിശ്രമിച്ചില്ലെങ്കിൽ ~${redEta} മിനിറ്റിൽ റെഡ് സ്റ്റോപ്പ്-വർക്ക് പരിധി എത്തിയേക്കാം.`;
       case 'ne':
         return `तापीय दबाब बढ्दैछ; अहिले छायामा आराम नगरे ~${redEta} मिनेटमा रातो काम-रोक सीमा पुग्न सक्छ।`;
+      case 'si':
+        return `තාප පීඩනය ඉහළ යමින් පවතී; දැන් හෙවණේ විවේක නොගතහොත් ~${redEta} මිනිත්තුවකින් රතු වැඩ-නැවතුම් සීමාවට ළඟා විය හැක.`;
     }
   }
 
@@ -515,7 +521,35 @@ export function buildDeterministicFallback(
             cached: false,
           };
 
-  return { en: baseEn, ar, hi, ur, bn, tl, ta, ml, ne };
+  const si: WorkerAlertCopy =
+    assessment.tier === 'Red'
+      ? {
+          headline: 'වහාම වැඩ නවත්වන්න — සිසිල් වන්න',
+          explanation: `${context.zone} හි අධික තාප පීඩනයක් හඳුනාගෙන ඇත.`,
+          action: 'වහාම සිසිල් කළ හෙවණැලි විවේක ස්ථානයට ගොස්, ආරක්ෂිත ඇඳුම් ලිහිල් කර, සිසිල් වතුර පානය කරන්න.',
+          proactiveForecastNote: buildLocalizedProactiveNote('si', context, assessment, forecast),
+          source: 'template_fallback',
+          cached: false,
+        }
+      : assessment.tier === 'Amber'
+        ? {
+            headline: 'හෙවණේ විවේක ගෙන ජලය පානය කරන්න',
+            explanation: `${context.zone} හි මධ්‍යම මට්ටමේ තාප පීඩනයක් ඇති වෙමින් පවතී.`,
+            action: 'දැන් විනාඩි 15ක් හෙවණේ විවේක ගෙන සිසිල් වතුර මිලි ලීටර් 300ක් පානය කරන්න.',
+            proactiveForecastNote: buildLocalizedProactiveNote('si', context, assessment, forecast),
+            source: 'template_fallback',
+            cached: false,
+          }
+        : {
+            headline: 'වැඩ කිරීමට ආරක්ෂිතයි — ජලය පානය කරන්න',
+            explanation: `${context.zone} හි තාප පීඩනය ආරක්ෂිත සීමාව තුළ පවතී.`,
+            action: 'ස්ථාවර වේගයෙන් කටයුතු කර විනාඩි 20කට වරක් ජලය පානය කරන්න.',
+            proactiveForecastNote: buildLocalizedProactiveNote('si', context, assessment, forecast),
+            source: 'template_fallback',
+            cached: false,
+          };
+
+  return { en: baseEn, ar, hi, ur, bn, tl, ta, ml, ne, si };
 }
 
 function normalizeUnicodeDigits(input: string): string {
@@ -681,7 +715,7 @@ async function explainAndTranslateWorkerAlert(
       : `Forecast status: insufficient trend data (${forecast.reason}). Do not invent a crossing time.`;
 
   const prompt = `You are SiteGuard's worker safety communicator for UAE (Dubai & Abu Dhabi) outdoor industrial crews.
-Generate a calm, clear, non-alarming alert in English (en), plus accurate natural everyday translations in Arabic (ar), Hindi (hi), Urdu (ur), Bengali (bn), Tagalog (tl), Tamil (ta), Malayalam (ml), and Nepali (ne). Keep numbers and units exact.
+Generate a calm, clear, non-alarming alert in English (en), plus accurate natural everyday translations in Arabic (ar), Hindi (hi), Urdu (ur), Bengali (bn), Tagalog (tl), Tamil (ta), Malayalam (ml), Nepali (ne), and Sinhala (si). Keep numbers and units exact.
 
 Worker context: Role=${context.roleLabel}, Zone=${context.zone}, PPE=${context.ppeLevel}, Acclimatization=${context.acclimatizationDays} days, Hydration count=${context.hydrationCount}, Planned break=${context.plannedBreakTime}.
 Current environment: Air ${env.airTempC}°C, Outdoor WBGT ${env.wbgtC}°C, UAE Midday Break active=${env.inUaeMiddayBreakWindow}.
@@ -696,7 +730,7 @@ STRICT SAFETY RULES FOR THRESHOLD ETAs (NEVER VIOLATE):
 3. When forecast.status is "insufficient_trend_data", never state any minute ETA.
 4. headline, explanation, and action must never state a crossing ETA that contradicts projectedAmberCrossingMin / projectedRedCrossingMin.
 
-For each language (en, ar, hi, ur, bn, tl, ta, ml, ne), provide:
+For each language (en, ar, hi, ur, bn, tl, ta, ml, ne, si), provide:
 - headline: max 6 words, uppercase clarity, calm safety directive
 - explanation: 1 short sentence explaining why in plain words (no jargon like "Moran PSI")
 - action: 1 concrete immediate action sentence
@@ -722,8 +756,9 @@ For each language (en, ar, hi, ur, bn, tl, ta, ml, ne), provide:
               ta: makeAlertCopySchema(),
               ml: makeAlertCopySchema(),
               ne: makeAlertCopySchema(),
+              si: makeAlertCopySchema(),
             },
-            required: ['en', 'ar', 'hi', 'ur', 'bn', 'tl', 'ta', 'ml', 'ne'],
+            required: ['en', 'ar', 'hi', 'ur', 'bn', 'tl', 'ta', 'ml', 'ne', 'si'],
           },
         },
       }),

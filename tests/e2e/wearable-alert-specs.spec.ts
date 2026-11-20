@@ -10,7 +10,7 @@ test.describe('Wearable Safety Alerts & Sensor Telemetry Specifications', () => 
     expect(res.ok()).toBeTruthy();
   });
 
-  test('Alert State Switcher toggles cleanly across all 4 alert specs, keeps Gemma 4 Edge pill visible on wearable display, and supports 5 languages + °C/°F', async ({
+  test('Alert State Switcher toggles cleanly across all 4 alert specs, keeps Gemma 4 Edge pill visible on wearable display, and supports 10 languages + °C/°F', async ({
     page,
   }) => {
     fs.mkdirSync(STATES_GALLERY, { recursive: true });
